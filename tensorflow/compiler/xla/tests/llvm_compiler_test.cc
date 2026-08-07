@@ -64,7 +64,7 @@ class GpuDummyCompiler : public GpuCompiler {
 #if GOOGLE_CUDA
     return se::CudaComputeCapability{0, 0};
 #elif TENSORFLOW_USE_ROCM
-    return se::RocmComputeCapability{"gfx908"};    
+    return se::RocmComputeCapability{"gfx928"};
 #endif      
   }
 
