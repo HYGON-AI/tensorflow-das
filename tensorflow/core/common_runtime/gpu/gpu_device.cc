@@ -1383,7 +1383,7 @@ Status BaseGPUDeviceFactory::CreateDevices(
       }
       err = hipFree(nullptr);
       if (err != hipSuccess) {
-        return errors::Internal("ROCm runtime implicit initialization on GPU:",
+        return errors::Internal("DTK runtime implicit initialization on GPU:",
                                 platform_device_id.value(),
                                 " failed. Status: ", hipGetErrorString(err));
       }
@@ -1942,7 +1942,7 @@ Status BaseGPUDeviceFactory::GetValidDeviceIds(
     VLOG(1) << "Found device " << i << " with properties: "
             << "\npciBusID: " << description->pci_bus_id()
             << " name: " << description->name()
-            << "     ROCm AMDGPU Arch: " << gcn_arch_name
+            << "     DTK AMDGPU Arch: " << gcn_arch_name
             << "\ncoreClock: " << description->clock_rate_ghz() << "GHz"
             << " coreCount: " << description->core_count()
             << " deviceMemorySize: "
@@ -2015,9 +2015,9 @@ Status BaseGPUDeviceFactory::GetValidDeviceIds(
       LOG(INFO) << "Ignoring visible gpu device "
                 << "(" << GetShortDeviceDescription(visible_gpu_id, *desc)
                 << ") "
-                << "with AMDGPU version : "
+                << "with DCU version : "
                 << rocm_compute_capability.gfx_version()
-                << ". The supported AMDGPU versions are "
+                << ". The supported DCU versions are "
                 << rocm_compute_capability.supported_gfx_versions_str() << ".";
       continue;
     }

@@ -115,7 +115,7 @@ bool GpuExecutor::UnloadModule(ModuleHandle module_handle) {
 tsl::StatusOr<std::shared_ptr<DeviceMemoryBase>>
 GpuExecutor::CreateOrShareConstant(Stream* stream,
                                    const std::vector<uint8_t>& content) {
-  return tsl::errors::Unimplemented("Not implemented for ROCm");
+  return tsl::errors::Unimplemented("Not implemented for DTK");
 }
 
 bool GpuExecutor::UnloadGpuBinary(const void* gpu_binary) {
@@ -182,7 +182,7 @@ tsl::Status GpuExecutor::Init(int device_ordinal,
 bool GpuExecutor::FindOnDiskForComputeCapability(
     absl::string_view filename, absl::string_view canonical_suffix,
     string* found_filename) const {
-  LOG(FATAL) << "Feature not supported on ROCM platform "
+  LOG(FATAL) << "Feature not supported on DTK platform "
                 "(FindOnDiskForComputeCapability)";
   return false;
 }
@@ -197,13 +197,13 @@ bool GpuExecutor::FindOnDiskForISAVersion(absl::string_view filename,
   string cc_specific =
       absl::StrCat(filename, ".cc", version_, canonical_suffix);
   if (tsl::Env::Default()->FileExists(cc_specific).ok()) {
-    VLOG(2) << "found AMDGPU ISA version-specific file, using that: "
+    VLOG(2) << "found DCU ISA version-specific file, using that: "
             << cc_specific;
     *found_filename = cc_specific;
     return true;
   }
 
-  VLOG(2) << "could not find AMDGPU ISA version-specific file at: "
+  VLOG(2) << "could not find DCU ISA version-specific file at: "
           << cc_specific;
   if (tsl::Env::Default()->FileExists(string(filename)).ok()) {
     *found_filename = string(filename);
@@ -248,7 +248,7 @@ tsl::Status GpuExecutor::GetKernel(const MultiKernelLoaderSpec& spec,
 
   if (on_disk_spec != nullptr) {
     return tsl::errors::Internal(
-        "Loading ROCM kernel from disk is not supported");
+        "Loading DTK kernel from disk is not supported");
   } else if (spec.has_cuda_cubin_in_memory()) {
     kernelname = &spec.cuda_cubin_in_memory().kernelname();
 
@@ -261,7 +261,7 @@ tsl::Status GpuExecutor::GetKernel(const MultiKernelLoaderSpec& spec,
     }
     kernel_to_gpu_binary_[kernel] = hsaco;
   } else {
-    return tsl::errors::Internal("No method of loading ROCM kernel provided");
+    return tsl::errors::Internal("No method of loading DTK kernel provided");
   }
 
   VLOG(2) << "getting function " << *kernelname << " from module " << module;
@@ -349,7 +349,7 @@ int GpuExecutor::CalculateOccupancy(const DeviceDescription& device_description,
                                     uint64_t shared_memory_per_block,
                                     const ThreadDim& thread_dims,
                                     GpuFunctionHandle func) {
-  LOG(FATAL) << "Feature not supported on ROCM platform (CalculateOccupancy)";
+  LOG(FATAL) << "Feature not supported on DTK platform (CalculateOccupancy)";
   return 0;
 }
 
@@ -359,7 +359,7 @@ int GpuExecutor::CompareOccupancy(int* initial_blocks,
                                   uint64_t shared_memory_per_block,
                                   const ThreadDim& thread_dims,
                                   GpuFunctionHandle func) {
-  LOG(FATAL) << "Feature not supported on ROCM platform (CompareOccupancy)";
+  LOG(FATAL) << "Feature not supported on DTK platform (CompareOccupancy)";
   return 0;
 }
 
@@ -384,12 +384,12 @@ tsl::Status GpuExecutor::LoadModule(const MultiModuleLoaderSpec& spec,
 
 tsl::Status GpuExecutor::LoadModuleFromCuBin(const char* cubin,
                                              hipModule_t* module) {
-  LOG(FATAL) << "Feature not supported on ROCM platform (LoadModuleFromCuBin)";
+  LOG(FATAL) << "Feature not supported on DTK platform (LoadModuleFromCuBin)";
 }
 
 tsl::Status GpuExecutor::LoadModuleFromPtx(const char* ptx,
                                            hipModule_t* module) {
-  LOG(FATAL) << "Feature not supported on ROCM platform (LoadModuleFromPtx)";
+  LOG(FATAL) << "Feature not supported on DTK platform (LoadModuleFromPtx)";
 }
 
 tsl::Status GpuExecutor::LoadModuleFromHsaco(const char* hsaco,
@@ -593,7 +593,7 @@ tsl::Status GpuExecutor::WaitForEvent(Stream* stream, Event* event) {
   } else {
     return tsl::Status{
         absl::StatusCode::kInternal,
-        absl::StrFormat("error recording waiting for ROCM event on stream %p",
+        absl::StrFormat("error recording waiting for DTK event on stream %p",
                         stream)};
   }
 }
@@ -940,7 +940,7 @@ GpuExecutor::CreateDeviceDescription(int device_ordinal) {
   }
 
   builder.set_platform_version(
-      absl::StrCat("AMDGPU ISA version: ", gcn_arch_name));
+      absl::StrCat("DCU ISA version: ", gcn_arch_name));
 
   // TODO(leary) should be a way to query this from the driver, but this is
   // unlikely to change for us any time soon.
