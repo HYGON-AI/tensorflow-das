@@ -1095,25 +1095,29 @@ class DepthwiseConv2dNativeBackpropFilterOp : public OpKernel {
 
     if (std::is_same<T, bfloat16>::value) {
       dtype_ = DT_BFLOAT16;
+      use_cudnn_grouped_conv_ = false;
     } else if (std::is_same<T, Eigen::half>::value) {
       dtype_ = DT_HALF;
+      use_cudnn_grouped_conv_ = false;
     } else if (std::is_same<T, float>::value) {
       dtype_ = DT_FLOAT;
+      use_cudnn_grouped_conv_ = true;
     } else if (std::is_same<T, double>::value) {
       dtype_ = DT_DOUBLE;
+      use_cudnn_grouped_conv_ = true;
     } else {
       LOG(ERROR) << "Only bfloat16, half, float, and double are supported.";
     }
-#if CUDNN_VERSION >= 8000
-    use_cudnn_grouped_conv_ = dtype_ == DT_HALF || dtype_ == DT_BFLOAT16;
-#elif CUDNN_VERSION >= 7603
-    // Use CuDNN grouped conv (filter gradients) when input/output is
-    // float16(half). See cudnn release note 7.6.3. (https://docs.nvidia.com/dee
-    // plearning/sdk/cudnn-release-notes/rel_763.html#rel_763)
-    use_cudnn_grouped_conv_ = dtype_ == DT_HALF;
-#else
-    use_cudnn_grouped_conv_ = false;
-#endif
+//#if CUDNN_VERSION >= 8000
+//    use_cudnn_grouped_conv_ = dtype_ == DT_HALF || dtype_ == DT_BFLOAT16;
+//#elif CUDNN_VERSION >= 7603
+//    // Use CuDNN grouped conv (filter gradients) when input/output is
+//    // float16(half). See cudnn release note 7.6.3. (https://docs.nvidia.com/dee
+//    // plearning/sdk/cudnn-release-notes/rel_763.html#rel_763)
+//    use_cudnn_grouped_conv_ = dtype_ == DT_HALF;
+//#else
+//    use_cudnn_grouped_conv_ = false;
+//#endif
   }
 
   void Compute(OpKernelContext* context) override {
@@ -1287,7 +1291,7 @@ TF_CALL_float(REGISTER_GPU_KERNEL);
 TF_CALL_double(REGISTER_GPU_KERNEL);
 #undef REGISTER_GPU_KERNEL
 
-#if CUDNN_VERSION >= 7000
+//#if CUDNN_VERSION >= 7000
 template <typename T>
 class DepthwiseConv2dGroupedConvBackpropFilterOp
     : public DepthwiseConv2dNativeBackpropFilterOp<GPUDevice, T> {
@@ -1306,12 +1310,12 @@ class DepthwiseConv2dGroupedConvBackpropFilterOp
                               .Label("cudnn_grouped_convolution"),    \
                           DepthwiseConv2dGroupedConvBackpropFilterOp<T>)
 
-TF_CALL_bfloat16(REGISTER_GROUPED_CONV_KERNEL);
-TF_CALL_half(REGISTER_GROUPED_CONV_KERNEL);
+//TF_CALL_bfloat16(REGISTER_GROUPED_CONV_KERNEL);
+//TF_CALL_half(REGISTER_GROUPED_CONV_KERNEL);
 TF_CALL_float(REGISTER_GROUPED_CONV_KERNEL);
 TF_CALL_double(REGISTER_GROUPED_CONV_KERNEL);
 #undef REGISTER_GROUPED_CONV_KERNEL
-#endif  // CUDNN_VERSION
+//#endif  // CUDNN_VERSION
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 }  // namespace tensorflow
