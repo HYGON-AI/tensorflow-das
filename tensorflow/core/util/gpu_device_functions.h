@@ -508,7 +508,7 @@ CREATE_CUDA_DEVICE_FUNCTION_ALIAS(GpuShuffleXorSync, CudaShuffleXorSync);
 // Wrapper for __ldg.
 template <typename T>
 __host__ __device__ T GpuLdg(const T* address) {
-#if __CUDA_ARCH__ >= 350
+#if __CUDA_ARCH__ >= 350 || TENSORFLOW_USE_ROCM
   return __ldg(address);
 #else
   return *address;

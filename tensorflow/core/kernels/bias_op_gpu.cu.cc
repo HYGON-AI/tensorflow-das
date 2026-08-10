@@ -147,12 +147,18 @@ __global__ void BiasGradNHWC_SharedAtomics(
   for (int32 index = blockIdx.x * blockDim.x + threadIdx.x; index < nthreads;
        index += blockDim.x * gridDim.x) {
     int32 bias_offset = index % bias_size;
-    GpuAtomicAddShared(s_data + bias_offset, AccT(ldg(output_backprop + index)));
+    const T output_value = ldg(output_backprop + index);
+    if(output_value != static_cast<T>(0)) {
+      GpuAtomicAddShared(s_data + bias_offset, AccT(output_value));
+    }
   }
   __syncthreads();
 
   for (int32 index = threadIdx.x; index < bias_size; index += blockDim.x) {
-    GpuAtomicAdd(bias_backprop + index, T(s_data[index]));
+    const AccT shared_value = s_data[index];
+    if(shared_value != AccT(0)) {
+      GpuAtomicAdd(bias_backprop + index, T(shared_value));
+    }
   }
 }
 
