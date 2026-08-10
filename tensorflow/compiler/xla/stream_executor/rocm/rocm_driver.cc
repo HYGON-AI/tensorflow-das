@@ -1274,10 +1274,10 @@ static tsl::StatusOr<T> GetSimpleAttribute(hipDevice_t device,
   }
 
   std::string gcnArchName = props.gcnArchName;
-  // On gfx90a, we hide 1 GB of GPU memory (512MB for gfx908) from TF,
+  // On gfx90a, we hide 1 GB of GPU memory (1 GB for gfx908) from TF,
   // to allow for late allocations by internal ROCm libraries
   // (e.g. rocBLAS alone needs~200 MB to put its kernels as of ROCm 4.1)
-  const uint64_t RESERVED_GFX908 = 1048576 * 512;
+  const uint64_t RESERVED_GFX908 = 1048576 * 1024;
   const uint64_t RESERVED_GFX9_X = 1048576 * 1024;
   if (gcnArchName.substr(0, 6) == "gfx908" ||
       gcnArchName.substr(0, 6) == "gfx906" ||
