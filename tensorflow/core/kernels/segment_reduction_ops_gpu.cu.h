@@ -64,7 +64,6 @@ struct ReduceUpdateOpFor {};
     using nonatomic_op = nonatomic;                               \
     static constexpr bool is_sum =                                \
         std::is_same<reduce_op, functor::Sum>::value;             \
-
   };
 DEFINE_REDUCE_UPDATE_OP_FOR(functor::Sum, AtomicSumOpGpu, NonAtomicSumOpGpu)
 DEFINE_REDUCE_UPDATE_OP_FOR(functor::Prod, AtomicProdOpGpu, NonAtomicProdOpGpu)
@@ -221,7 +220,7 @@ __global__ void UnsortedSegmentCustomKernel(
         output_segment_index >= output_outer_dim_size) {
       continue;
     }
-    
+
     const T input_value = ldg(input + input_index);
     if (SkipZero && input_value == static_cast<T>(0)) {
         continue;
