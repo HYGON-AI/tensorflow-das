@@ -132,8 +132,18 @@ struct FusedBatchNormInferenceKernel {
                              const U* __restrict__ var,
                              const T* __restrict__ side_input, float epsilon,
                              T* __restrict__ out) {
+    extern __shared__ U shared_data[];
+
     int32 index = blockIdx.x * blockDim.x + threadIdx.x;
     const int32 total_device_threads = gridDim.x * blockDim.x;
+
+    for (int i = threadIdx.x; i < channels_size; i += blockDim.x) {
+      shared_data[i] = scale[i];
+      shared_data[i + channels_size] = offset[i];
+      shared_data[i + 2 * channels_size] = mean[i];
+      shared_data[i + 3 * channels_size] = var[i];
+    }
+    __syncthreads();
 
     while (index < count) {
       const int channel = (tensor_format == FORMAT_NHWC)
@@ -141,13 +151,12 @@ struct FusedBatchNormInferenceKernel {
                               : (index / inner_dim_size) % channels_size;
 
       U in_v = U(in[index]);
-      U scale_v = scale[channel];
-      U offset_v = offset[channel];
-      U mean_v = mean[channel];
-      U var_v = var[channel];
+      U scale_v = shared_data[channel];
+      U offset_v = shared_data[channel + channels_size];
+      U mean_v = shared_data[channel + 2 * channels_size];
+      U var_v = shared_data[channel + 3 * channels_size];
 
       U scaling_factor_v = rsqrt(var_v + epsilon) * scale_v;
-      static_assert(std::is_same<U, float>::value, "U data type must be float");
       U shifted_v = fmaf(in_v - mean_v, scaling_factor_v, offset_v);
 
       if (add_side_input) {
