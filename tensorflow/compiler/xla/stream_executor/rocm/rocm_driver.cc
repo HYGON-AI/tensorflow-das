@@ -1271,10 +1271,10 @@ static tsl::StatusOr<T> GetSimpleAttribute(hipDevice_t device,
   if (gcnArchName.substr(0, 6) == "gfx908" ||
       gcnArchName.substr(0, 6) == "gfx906" ||
       gcnArchName.substr(0, 6) == "gfx926" ||
-      gcnArchName.substr(0, 6) == "gfx928" ||
       gcnArchName.substr(0, 6) == "gfx936" ) {
     *reserve = RESERVED_GFX908;
   } else if (gcnArchName.substr(0, 6) == "gfx90a" ||
+             gcnArchName.substr(0, 6) == "gfx928" ||
              gcnArchName.substr(0, 6) == "gfx940" ||
              gcnArchName.substr(0, 6) == "gfx941" ||
              gcnArchName.substr(0, 6) == "gfx942" ) {
