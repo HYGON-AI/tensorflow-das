@@ -813,7 +813,7 @@ void LaunchRowReduction(OpKernelContext* ctx, OUT_T out, IN_T in, int num_rows,
   constexpr int WARPSIZE = TF_RED_WARPSIZE;
 #endif
   if (num_cols < 1024) {
-    const int threads_per_block = 128;
+    const int threads_per_block = 1024;
     const int warps_per_block = threads_per_block / WARPSIZE;
     int num_blocks = (num_rows + warps_per_block - 1) / warps_per_block;
     auto fun = WARPSIZE==32 
