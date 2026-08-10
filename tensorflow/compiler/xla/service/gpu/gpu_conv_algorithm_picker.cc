@@ -46,6 +46,7 @@ limitations under the License.
 #include "tensorflow/tsl/platform/logger.h"
 #include "tensorflow/tsl/platform/numbers.h"
 #include "tensorflow/tsl/util/proto/proto_utils.h"
+#include "tensorflow/tsl/util/env_var.h"
 
 #if (defined(GOOGLE_CUDA) && GOOGLE_CUDA)
 #include "third_party/gpus/cudnn/cudnn.h"
