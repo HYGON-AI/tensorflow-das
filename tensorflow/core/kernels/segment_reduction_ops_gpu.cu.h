@@ -62,6 +62,9 @@ struct ReduceUpdateOpFor {};
   struct ReduceUpdateOpFor<reduce_op> {                           \
     using atomic_op = atomic;                                     \
     using nonatomic_op = nonatomic;                               \
+    static constexpr bool is_sum =                                \
+        std::is_same<reduce_op, functor::Sum>::value;             \
+
   };
 DEFINE_REDUCE_UPDATE_OP_FOR(functor::Sum, AtomicSumOpGpu, NonAtomicSumOpGpu)
 DEFINE_REDUCE_UPDATE_OP_FOR(functor::Prod, AtomicProdOpGpu, NonAtomicProdOpGpu)
@@ -204,7 +207,7 @@ Status LaunchSegmentSetEmptyKernel(
 // UnsortedSegmentSumKernel processes 'input_total_size' elements.
 // Each element is mapped from input to output by a combination of its
 // 'segment_ids' mapping and 'inner_dim_size'.
-template <typename T, typename Index, typename KernelReductionFunctor>
+template <typename T, typename Index, typename KernelReductionFunctor, bool SkipZero>
 __global__ void UnsortedSegmentCustomKernel(
     const int64_t input_outer_dim_size, const int64_t inner_dim_size,
     const int64_t output_outer_dim_size, const Index* __restrict__ segment_ids,
@@ -218,9 +221,14 @@ __global__ void UnsortedSegmentCustomKernel(
         output_segment_index >= output_outer_dim_size) {
       continue;
     }
+    
+    const T input_value = ldg(input + input_index);
+    if (SkipZero && input_value == static_cast<T>(0)) {
+        continue;
+    }
     const int64_t output_index =
         output_segment_index * inner_dim_size + segment_offset;
-    KernelReductionFunctor()(output + output_index, ldg(input + input_index));
+    KernelReductionFunctor()(output + output_index, input_value);
   }
 }
 
@@ -876,9 +884,11 @@ struct UnsortedSegmentFunctor<GPUDevice, T, Index, InitialValueF, ReductionF> {
         return;
       }
       config = GetGpuLaunchConfig(data_size, d);
+      using ReductionUpdateOp = typename ReduceUpdateOpFor<ReductionF>::atomic_op;
+      constexpr bool SkipZero = ReduceUpdateOpFor<ReductionF>::is_sum;
       TF_CHECK_OK(GpuLaunchKernel(
           UnsortedSegmentCustomKernel<
-              T, Index, typename ReduceUpdateOpFor<ReductionF>::atomic_op>,
+              T, Index, ReductionUpdateOp, SkipZero>,
           config.block_count, config.thread_per_block, 0, d.stream(),
           input_outer_dim_size, input_inner_dim_size, output_outer_dim_size,
           unsorted_segment_ids.data(), data.data(), output.data()));
