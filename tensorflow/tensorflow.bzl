@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
 #
 # Returns the options to use for a C++ library or binary build.
 # Uses the ":optmode" config_setting to pick the options.
@@ -1282,6 +1285,7 @@ def _generate_op_reg_offsets_impl(ctx):
         tools = [ctx.executable._offset_counter],
         executable = ctx.executable._offset_counter,
         arguments = [args],
+        use_default_shell_env = True,
     )
 
 generate_op_reg_offsets = rule(
