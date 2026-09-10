@@ -1160,7 +1160,7 @@ class DepthwiseConv2dNativeBackpropFilterOp : public OpKernel {
     // and later intentionally. This is to avoid potential issues with earlier
     // versions of cuDNN.
     bool determinism_required = false;
-#if CUDNN_VERSION >= 7603
+#if CUDNN_VERSION >= 7603 || TENSORFLOW_USE_ROCM
     determinism_required = OpDeterminismRequired();
 #endif  // CUDNN_VERSION >= 7603
     bool use_cudnn =
