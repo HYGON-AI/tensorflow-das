@@ -1,4 +1,7 @@
 /* Copyright 2016 The TensorFlow Authors. All Rights Reserved.
+Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+SPDX-License-Identifier: Apache-2.0
+Modified by Hygon Information Technology Co., Ltd., 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,6 +15,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
+
 #include "tensorflow/core/nccl/nccl_manager.h"
 
 #include <utility>
@@ -47,7 +51,7 @@ using se::rocm::ScopedActivateExecutorContext;
 #define cudaGetDevice hipGetDevice
 #define cudaSetDevice hipSetDevice
 #define cudaSuccess hipSuccess
-int NcclManager::instance_count = 0;
+// int NcclManager::instance_count = 0;
 #endif
 
 #define NCCL_RETURN_IF_ERROR(...)                                        \
@@ -173,16 +177,16 @@ struct NcclManager::Collective : public core::RefCounted {
         single_node(num_local_devices_in == num_global_devices_in),
         communicator_key(communicator_key_in) {
     participants.reserve(num_local_devices_in);
-#if TENSORFLOW_USE_ROCM
+// #if TENSORFLOW_USE_ROCM
     // On ROCm platform, this allows caller to either use the singleton instance
     // or to manage one non-singleton NcclManager instance.
     // For example, the nccl_manager_test will use both paradigms in the same
     // executable, but not running concurrently (which would hang otherwise).
-    if (NcclManager::instance_count > 1) {
-      status = errors::Internal(
-          "ROCm cannot use multi-node NCCL collectives on a single node");
-    }
-#endif
+//     if (NcclManager::instance_count > 1) {
+//       status = errors::Internal(
+//           "ROCm cannot use multi-node NCCL collectives on a single node");
+//     }
+// #endif
   }
 
   const string collective_key;  // A unique key for debugging.
@@ -227,15 +231,15 @@ struct NcclManager::Collective : public core::RefCounted {
 
 NcclManager::NcclManager() {
   VLOG(2) << "New NcclManager " << this;
-#if TENSORFLOW_USE_ROCM
-  ++instance_count;
-#endif
+// #if TENSORFLOW_USE_ROCM
+//   ++instance_count;
+// #endif
 }
 NcclManager::~NcclManager() {
   VLOG(2) << "~NcclManager " << this;
-#if TENSORFLOW_USE_ROCM
-  --instance_count;
-#endif
+// #if TENSORFLOW_USE_ROCM
+//   --instance_count;
+// #endif
   for (auto& it : device_to_comm_streams_) {
     for (NcclStream* nccl_stream : it.second) {
       {
@@ -249,12 +253,12 @@ NcclManager::~NcclManager() {
 }
 NcclManager* NcclManager::instance() {
   static NcclManager* instance = new NcclManager();
-#if TENSORFLOW_USE_ROCM
+// #if TENSORFLOW_USE_ROCM
   // singleton does not count against total instances
   // see comment above in Collective constructor concerning ROCm platform
-  static absl::once_flag once;
-  absl::call_once(once, [] { --NcclManager::instance_count; });
-#endif
+//   static absl::once_flag once;
+//   absl::call_once(once, [] { --NcclManager::instance_count; });
+// #endif
   return instance;
 }
 
