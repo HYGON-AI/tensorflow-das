@@ -1,4 +1,7 @@
 # Copyright 2018 The TensorFlow Authors. All Rights Reserved.
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
 """Library for testing DistributionStrategy descendants."""
 
 import functools
@@ -219,6 +223,8 @@ class DistributionTestBase(test.TestCase):
          ops.Graph().as_default(), \
          self.cached_session(config=config) as sess, \
          d.scope():
+      effective_learning_rate = (
+          learning_rate / float(d.num_replicas_in_sync))
       kernel = create_variable_like_keras_layer(
           name="kernel", shape=(1, 1), dtype=dtypes.float32)
 
@@ -230,7 +236,7 @@ class DistributionTestBase(test.TestCase):
       grad_fn = backprop.implicit_grad(loss)
 
       def update(v, g):
-        return v.assign_sub(learning_rate * g)
+        return v.assign_sub(effective_learning_rate * g)
 
       one = array_ops.identity([[1.]])
 
@@ -767,12 +773,14 @@ class RemoteSingleWorkerMirroredStrategyBase(DistributionTestBase):
       self.assertEqual(b.device, "/job:worker/replica:0/task:0/device:CPU:0")
 
   def _testMakeInputFnIteratorWithDataset(self, distribution):
-    dataset_fn = lambda: dataset_ops.Dataset.range(100)
+    dataset_size = 100
+    dataset_fn = lambda: dataset_ops.Dataset.range(dataset_size)
     num_gpus = self._get_num_gpus()  # pylint: disable=assignment-from-no-return
     num_workers = 1
 
+    full_dataset_size = dataset_size - dataset_size % num_gpus
     expected_values = [[i+j for j in range(num_gpus)] * num_workers
-                       for i in range(0, 100, num_gpus)]
+                       for i in range(0, full_dataset_size, num_gpus)]
 
     # Dummy cached_session is used in Eager
     with self.cached_session() as sess:
@@ -788,16 +796,18 @@ class RemoteSingleWorkerMirroredStrategyBase(DistributionTestBase):
           iterator, distribution.extended.worker_devices, expected_values, sess)
 
   def _testMakeInputFnIteratorWithCallable(self, distribution):
+    dataset_size = 100
     def fn():
-      dataset = dataset_ops.Dataset.range(100)
+      dataset = dataset_ops.Dataset.range(dataset_size)
       it = dataset_ops.make_one_shot_iterator(dataset)
       return it.get_next
 
     num_gpus = self._get_num_gpus()  # pylint: disable=assignment-from-no-return
     num_workers = 1
 
+    full_dataset_size = dataset_size - dataset_size % num_gpus
     expected_values = []
-    for i in range(0, 100, num_gpus):
+    for i in range(0, full_dataset_size, num_gpus):
       expected_values.append([i+j for j in range(num_gpus)] * num_workers)
 
     # Dummy cached_session is used in Eager

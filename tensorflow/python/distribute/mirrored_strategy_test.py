@@ -1,4 +1,7 @@
 # Copyright 2018 The TensorFlow Authors. All Rights Reserved.
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
 """Tests for MirroredStrategy."""
 
 import json
@@ -1303,13 +1307,15 @@ class MultiWorkerMirroredStrategyTest(
       self.assertEqual(b.device, "/job:worker/task:0/device:CPU:0")
 
   def testMakeInputFnIteratorWithDataset(self, distribution):
+    dataset_size = 100
     self._configure_distribution_strategy(distribution)
-    dataset_fn = lambda: dataset_ops.Dataset.range(100)
+    dataset_fn = lambda: dataset_ops.Dataset.range(dataset_size)
     num_gpus = context.num_gpus()
     num_workers = 2
 
+    full_dataset_size = dataset_size - dataset_size % num_gpus
     expected_values = [[i+j for j in range(num_gpus)] * num_workers
-                       for i in range(0, 100, num_gpus)]
+                       for i in range(0, full_dataset_size, num_gpus)]
 
     with context.graph_mode(), self.cached_session() as sess:
       # `expected_input_pipeline_id` is None because the input_fn will be called
@@ -1325,15 +1331,17 @@ class MultiWorkerMirroredStrategyTest(
 
   def testMakeInputFnIteratorWithCallable(self, distribution):
     self._configure_distribution_strategy(distribution)
+    dataset_size = 100
     def fn():
-      dataset = dataset_ops.Dataset.range(100)
+      dataset = dataset_ops.Dataset.range(dataset_size)
       it = dataset_ops.make_one_shot_iterator(dataset)
       return it.get_next
     num_gpus = context.num_gpus()
     num_workers = 2
 
+    full_dataset_size = dataset_size - dataset_size % num_gpus
     expected_values = []
-    for i in range(0, 100, num_gpus):
+    for i in range(0, full_dataset_size, num_gpus):
       expected_values.append([i+j for j in range(num_gpus)] * num_workers)
 
     with context.graph_mode(), self.cached_session() as sess:
