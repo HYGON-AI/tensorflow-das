@@ -19,6 +19,7 @@ from tensorflow.python.client import pywrap_tf_session
 from tensorflow.python.util.tf_export import tf_export
 
 __version__ = pywrap_tf_session.__version__
+__dcu_version__ = pywrap_tf_session.__dcu_version__
 __git_version__ = pywrap_tf_session.__git_version__
 __compiler_version__ = pywrap_tf_session.__compiler_version__
 __cxx11_abi_flag__ = pywrap_tf_session.__cxx11_abi_flag__
@@ -31,6 +32,12 @@ tf_export(
     "__version__",
     v1=["version.VERSION", "VERSION", "__version__"]).export_constant(
         __name__, "VERSION")
+DCU_VERSION = __dcu_version__
+tf_export(
+    "version.DCU_VERSION",
+    "__dcu_version__",
+    v1=["version.DCU_VERSION", "DCU_VERSION",
+        "__dcu_version__"]).export_constant(__name__, "DCU_VERSION")
 GIT_VERSION = __git_version__
 tf_export(
     "version.GIT_VERSION",
@@ -88,6 +95,7 @@ tf_export(
 
 __all__ = [
     "__version__",
+    "__dcu_version__",
     "__git_version__",
     "__compiler_version__",
     "__cxx11_abi_flag__",

@@ -290,7 +290,7 @@ string ROCMPointersToCanAccessString(hipDeviceptr_t from, hipDeviceptr_t to) {
 static tsl::Status InternalInit() {
   hipError_t res = hipErrorNoDevice;
   if (FLAGS_gpuexec_rocm_driver_inject_init_error) {
-    LOG(ERROR) << "injecting ROCM init error; initialization will fail";
+    LOG(ERROR) << "injecting DTK init error; initialization will fail";
   } else {
     res = wrap::hipInit(0 /* = flags */);
   }
@@ -375,7 +375,7 @@ bool DeviceOptionsToContextFlags(const DeviceOptions& device_options,
 /* static */ tsl::Status GpuDriver::FuncSetCacheConfig(
     hipFunction_t function, hipFuncCache_t cache_config) {
   RETURN_IF_ROCM_ERROR(wrap::hipFuncSetCacheConfig(function, cache_config),
-                       "Failed to set ROCM kernel cache config.");
+                       "Failed to set DTK kernel cache config.");
   return tsl::OkStatus();
 }
 
@@ -392,7 +392,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
     GpuContext* context, hipSharedMemConfig shared_mem_config) {
   ScopedActivateContext activation{context};
   RETURN_IF_ROCM_ERROR(wrap::hipDeviceSetSharedMemConfig(shared_mem_config),
-                       "Failed to set ROCM device shared memory config");
+                       "Failed to set DTK device shared memory config");
   return tsl::OkStatus();
 }
 
@@ -411,7 +411,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
                            function, grid_dim_x, grid_dim_y, grid_dim_z,
                            block_dim_x, block_dim_y, block_dim_z,
                            shared_mem_bytes, stream, kernel_params, extra),
-                       "Failed to launch ROCm kernel: ", kernel_name,
+                       "Failed to launch DTK kernel: ", kernel_name,
                        " with block dimensions: ", block_dim_x, "x",
                        block_dim_y, "x", block_dim_z);
   VLOG(2) << "successfully launched kernel";
@@ -421,7 +421,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
 /* static */ tsl::Status GpuDriver::LoadPtx(GpuContext* context,
                                             const char* ptx_contents,
                                             hipModule_t* module) {
-  LOG(ERROR) << "Feature not supported on ROCm platform (LoadPtx)";
+  LOG(ERROR) << "Feature not supported on DTK platform (LoadPtx)";
   return tsl::errors::Internal("Not Implemented");
 }
 
@@ -429,7 +429,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
                                               const char* cubin_bytes,
                                               hipModule_t* module) {
   return tsl::Status{absl::StatusCode::kInternal,
-                     "Feature not supported on ROCm platform (LoadCubin)"};
+                     "Feature not supported on DTK platform (LoadCubin)"};
 }
 
 /* static */ tsl::Status GpuDriver::LoadHsaco(GpuContext* context,
@@ -568,7 +568,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
         stream, hipStreamDefault, priority);  // switch to hipStreamNonBlocking?
   }
   if (res != hipSuccess) {
-    LOG(ERROR) << "could not allocate ROCM stream for device "
+    LOG(ERROR) << "could not allocate DTK stream for device "
                << context->device_ordinal() << ": " << ToString(res);
     return false;
   }
@@ -587,7 +587,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   ScopedActivateContext activated{context};
   hipError_t res = wrap::hipStreamDestroy(*stream);
   if (res != hipSuccess) {
-    LOG(ERROR) << "failed to destroy ROCM stream for device "
+    LOG(ERROR) << "failed to destroy DTK stream for device "
                << context->device_ordinal() << ": " << ToString(res);
   } else {
     VLOG(2) << "successfully destroyed stream " << *stream << " for device "
@@ -632,14 +632,14 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   ScopedActivateContext activated{context};
 
   LOG(ERROR)
-      << "Feature not supported on ROCm platform (UnifiedMemoryAllocate)";
+      << "Feature not supported on DTK platform (UnifiedMemoryAllocate)";
   return nullptr;
 }
 
 /* static */ void GpuDriver::UnifiedMemoryDeallocate(GpuContext* context,
                                                      void* location) {
   LOG(ERROR)
-      << "Feature not supported on ROCm platform (UnifiedMemoryDeallocate)";
+      << "Feature not supported on DTK platform (UnifiedMemoryDeallocate)";
 }
 
 /* static */ void* GpuDriver::HostAllocate(GpuContext* context,
@@ -709,12 +709,12 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
     case hipErrorNotInitialized:
       return tsl::Status{
           absl::StatusCode::kFailedPrecondition,
-          absl::StrFormat("error destroying ROCM event in device %d: %s",
+          absl::StrFormat("error destroying DTK event in device %d: %s",
                           context->device_ordinal(), ToString(res).c_str())};
     default:
       return tsl::Status{
           absl::StatusCode::kInternal,
-          absl::StrFormat("error destroying ROCM event in device %d: %s",
+          absl::StrFormat("error destroying DTK event in device %d: %s",
                           context->device_ordinal(), ToString(res).c_str())};
   }
 }
@@ -731,12 +731,12 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
     case hipErrorNotInitialized:
       return tsl::Status{
           absl::StatusCode::kFailedPrecondition,
-          absl::StrFormat("error recording ROCM event on stream %p: %s", stream,
+          absl::StrFormat("error recording DTK event on stream %p: %s", stream,
                           ToString(res).c_str())};
     default:
       return tsl::Status{
           absl::StatusCode::kInvalidArgument,
-          absl::StrFormat("error recording ROCM event on stream %p: %s", stream,
+          absl::StrFormat("error recording DTK event on stream %p: %s", stream,
                           ToString(res).c_str())};
   }
 }
@@ -793,7 +793,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   ScopedActivateContext activation{context};
   hipError_t res = wrap::hipDeviceSynchronize();
   if (res != hipSuccess) {
-    LOG(ERROR) << "could not synchronize on ROCM device: " << ToString(res)
+    LOG(ERROR) << "could not synchronize on DTK device: " << ToString(res)
                << " :: " << tsl::CurrentStackTrace();
     return false;
   }
@@ -806,7 +806,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   ScopedActivateContext activated{context};
   CHECK(stream != nullptr);
   RETURN_IF_ROCM_ERROR(wrap::hipStreamSynchronize(stream),
-                       "Could not synchronize on ROCM stream");
+                       "Could not synchronize on DTK stream");
   VLOG(2) << "successfully synchronized stream " << stream << " on device "
           << context->device_ordinal();
   return tsl::OkStatus();
@@ -964,11 +964,11 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
     return tsl::OkStatus();
   } else if (res == hipErrorMemoryAllocation) {
     return tsl::Status{absl::StatusCode::kResourceExhausted,
-                       "could not create ROCM event: out of device memory"};
+                       "could not create DTK event: out of device memory"};
   } else {
     return tsl::Status{
         absl::StatusCode::kFailedPrecondition,
-        absl::StrCat("could not create ROCM event: ", ToString(res))};
+        absl::StrCat("could not create DTK event: ", ToString(res))};
   }
 }
 
@@ -976,7 +976,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   int device_count = 0;
   hipError_t res = wrap::hipGetDeviceCount(&device_count);
   if (res != hipSuccess) {
-    LOG(ERROR) << "could not retrieve ROCM device count: " << ToString(res);
+    LOG(ERROR) << "could not retrieve DTK device count: " << ToString(res);
     return 0;
   }
 
@@ -992,7 +992,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   return tsl::Status(
       absl::StatusCode::kInternal,
       absl::StrFormat("failed to get compute capability for device: %d "
-                      "(unsupported API on AMD Gpus)",
+                      "(unsupported API on DCU)",
                       device));
 }
 
@@ -1031,7 +1031,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
       default:
         return tsl::Status{
             absl::StatusCode::kInternal,
-            absl::StrCat("unknown memory space provided by ROCM API: ", value)};
+            absl::StrCat("unknown memory space provided by DTK API: ", value)};
     }
   }
 
@@ -1080,7 +1080,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   *version = 0;
   return tsl::Status{
       absl::StatusCode::kInternal,
-      absl::StrFormat("failed to determine AMDGpu ISA version for device %d",
+      absl::StrFormat("failed to determine DCU ISA version for device %d",
                       device)};
 }
 
@@ -1095,7 +1095,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   *gcnArchName = "";
   return tsl::Status{
       absl::StatusCode::kInternal,
-      absl::StrFormat("failed to determine AMDGpu GCN Arch Name for device %d",
+      absl::StrFormat("failed to determine DCU GCN Arch Name for device %d",
                       device)};
 }
 
@@ -1117,7 +1117,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   }
   return tsl::Status{
       absl::StatusCode::kInternal,
-      absl::StrFormat("failed to determine AMDGpu GCN Arch Name for device %d",
+      absl::StrFormat("failed to determine DCU GCN Arch Name for device %d",
                       dev)};
 }
 
@@ -1131,7 +1131,7 @@ static tsl::StatusOr<T> GetSimpleAttribute(hipDevice_t device,
   if (result != hipSuccess) {
     return tsl::Status{
         absl::StatusCode::kNotFound,
-        absl::StrCat("could not retrieve ROCM device attribute (", attribute,
+        absl::StrCat("could not retrieve DTK device attribute (", attribute,
                      "): ", ToString(result))};
   }
   T converted = value;

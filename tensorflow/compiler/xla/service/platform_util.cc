@@ -150,10 +150,10 @@ static bool IsDeviceSupported(se::StreamExecutor* executor) {
   } else if (executor->platform()->id() == se::rocm::kROCmPlatformId) {
     auto rocm_compute_capability = description.rocm_compute_capability();
     if (!rocm_compute_capability.is_supported_gfx_version()) {
-      LOG(INFO) << "StreamExecutor ROCM device (" << executor->device_ordinal()
+      LOG(INFO) << "StreamExecutor DTK device (" << executor->device_ordinal()
                 << ") is of unsupported "
-                << "AMDGPU version : " << rocm_compute_capability.gfx_version()
-                << ". The supported AMDGPU versions are "
+                << "DCU version : " << rocm_compute_capability.gfx_version()
+                << ". The supported DCU versions are "
                 << rocm_compute_capability.supported_gfx_versions_str() << ".";
       return false;
     }

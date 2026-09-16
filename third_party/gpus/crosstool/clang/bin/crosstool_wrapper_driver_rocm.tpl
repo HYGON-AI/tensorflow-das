@@ -179,6 +179,7 @@ def InvokeHipcc(argv, log=False):
   hipccopts += defines
   hipccopts += std_options
   hipccopts += m_options
+  hipccopts += ' --gpu-max-threads-per-block=1024 '
 
   if depfiles:
     # Generate the dependency file

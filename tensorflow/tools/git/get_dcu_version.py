@@ -1,0 +1,54 @@
+import subprocess
+from pathlib import Path
+import os
+UNKNOWN = "Unknown"
+
+def sha_value(tf_root):
+    try:
+        return (
+            subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tf_root)
+            .decode("ascii")
+            .strip()
+        )
+    except Exception:
+        return UNKNOWN
+
+def abi_value():
+    try:
+        return (
+            subprocess.check_output("echo '#include <string>' | gcc -x c++ -E -dM - | fgrep _GLIBCXX_USE_CXX11_ABI", shell=True)
+            .decode('ascii')
+            .strip()[-1]
+        )
+    except Exception:
+        return UNKNOWN
+
+def dtk_version_value():
+    try:
+       dtk_path=os.getenv('ROCM_PATH')
+       dtk_version_path = os.path.join(dtk_path, '.info', "version-dev")
+       with open(dtk_version_path, 'r',encoding='utf-8') as file:
+           lines = file.readlines()
+       dtk_version="dtk"+lines[0][:-2].replace(".", "")
+       return dtk_version
+    except Exception:
+       return UNKNOWN
+
+def tfwhl_name():
+    try:
+        tf_root = Path(__file__).parent
+        sha = "git" + sha_value(tf_root)[0:7]
+        abi = "abi" + abi_value()
+        dtk_version = dtk_version_value()
+        whl_name = "+" + sha + "." + abi +"." + dtk_version
+        return whl_name
+    except Exception:
+        return UNKNOWN
+
+def dcu_version():
+    try:
+        tf_version = '2.13.1'
+        dcu_version = tf_version + tfwhl_name()
+        return dcu_version
+    except Exception:
+        return UNKNOWN

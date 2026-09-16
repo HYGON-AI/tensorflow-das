@@ -443,8 +443,8 @@ tsl::Status ROCMBlas::DoBlasGemm(Stream *stream, blas::Transpose transa,
 
   switch (dtype) {
     case blas::DataType::kHalf: {
-      tsl::StatusOr<bool> maybe_hasXDLOPS = GpuDriver::GetMFMASupport();
-      if (maybe_hasXDLOPS.ok() && maybe_hasXDLOPS.value()) {
+      //tsl::StatusOr<bool> maybe_hasXDLOPS = GpuDriver::GetMFMASupport();
+      //if (maybe_hasXDLOPS.ok() && maybe_hasXDLOPS.value()) {
         VLOG(1) << "Using rocblas_gemm_ex";
 
         bool is_backprop =
@@ -464,20 +464,20 @@ tsl::Status ROCMBlas::DoBlasGemm(Stream *stream, blas::Transpose transa,
             rocblas_datatype_f16_r, lda, b.opaque(), rocblas_datatype_f16_r,
             ldb, beta, c->opaque(), rocblas_datatype_f16_r, ldc, c->opaque(),
             rocblas_datatype_f16_r, ldc, rocblas_datatype_f32_r,
-            rocblas_gemm_algo_standard, 0, flags);
-      } else {
-        VLOG(1) << "Using rocblas_hgemm";
-        const Eigen::half alpha_half(*static_cast<const float *>(alpha));
-        const Eigen::half beta_half(*static_cast<const float *>(beta));
-        return DoBlasInternalStatus(
-            wrap::rocblas_hgemm, stream, /* pointer_mode_host = */ true,
-            ROCMBlasTranspose(transa), ROCMBlasTranspose(transb), m, n, k,
-            reinterpret_cast<const rocblas_half *>(&alpha_half),
-            reinterpret_cast<const rocblas_half *>(a.opaque()), lda,
-            reinterpret_cast<const rocblas_half *>(b.opaque()), ldb,
-            reinterpret_cast<const rocblas_half *>(&beta_half),
-            reinterpret_cast<rocblas_half *>(c->opaque()), ldc);
-      }
+            rocblas_gemm_algo_standard, 0, 0);
+//      } else {
+//        VLOG(1) << "Using rocblas_hgemm";
+//        const Eigen::half alpha_half(*static_cast<const float *>(alpha));
+//        const Eigen::half beta_half(*static_cast<const float *>(beta));
+//        return DoBlasInternalStatus(
+//            wrap::rocblas_hgemm, stream, /* pointer_mode_host = */ true,
+//            ROCMBlasTranspose(transa), ROCMBlasTranspose(transb), m, n, k,
+//            reinterpret_cast<const rocblas_half *>(&alpha_half),
+//            reinterpret_cast<const rocblas_half *>(a.opaque()), lda,
+//            reinterpret_cast<const rocblas_half *>(b.opaque()), ldb,
+//            reinterpret_cast<const rocblas_half *>(&beta_half),
+//            reinterpret_cast<rocblas_half *>(c->opaque()), ldc);
+//      }
     }
     case blas::DataType::kBF16:
       return DoBlasInternalStatus(
@@ -1096,18 +1096,29 @@ tsl::Status ROCMBlas::DoBlasGemmStridedBatched(
 
   switch (dtype) {
     case blas::DataType::kHalf: {
-      const Eigen::half alpha_half(*static_cast<const float *>(alpha));
-      const Eigen::half beta_half(*static_cast<const float *>(beta));
       return DoBlasInternalStatus(
-          wrap::rocblas_hgemm_strided_batched, stream,
+          wrap::rocblas_gemm_strided_batched_ex, stream,
           false, /* pointer_mode_host */
-          ROCMBlasTranspose(transa), ROCMBlasTranspose(transb), m, n, k,
-          reinterpret_cast<const rocblas_half *>(&alpha_half),
-          reinterpret_cast<const rocblas_half *>(a.opaque()), lda, stride_a,
-          reinterpret_cast<const rocblas_half *>(b.opaque()), ldb, stride_b,
-          reinterpret_cast<const rocblas_half *>(&beta_half),
-          reinterpret_cast<rocblas_half *>(c->opaque()), ldc, stride_c,
-          batch_count);
+          ROCMBlasTranspose(transa), ROCMBlasTranspose(transb), m, n, k, alpha,
+          a.opaque(), rocblas_datatype_f16_r, lda, stride_a, b.opaque(),
+          rocblas_datatype_f16_r, ldb, stride_b, beta, c->opaque(),
+          rocblas_datatype_f16_r, ldc, stride_c, c->opaque(),
+          rocblas_datatype_f16_r, ldc, stride_c, batch_count,
+          rocblas_datatype_f32_r, rocblas_gemm_algo_standard, 0, 0);
+      // change rocblas_hgemm_strided_batched to rocblas_gemm_strided_batched_ex (fp16 to fp32r)
+      //const Eigen::half alpha_half(*static_cast<const float *>(alpha));
+      //const Eigen::half beta_half(*static_cast<const float *>(beta));
+      //return DoBlasInternalStatus(
+      //    wrap::rocblas_hgemm_strided_batched, stream,
+      //    false, /* pointer_mode_host */
+      //    ROCMBlasTranspose(transa), ROCMBlasTranspose(transb), m, n, k,
+      //    reinterpret_cast<const rocblas_half *>(&alpha_half),
+      //    reinterpret_cast<const rocblas_half *>(a.opaque()), lda, stride_a,
+      //    reinterpret_cast<const rocblas_half *>(b.opaque()), ldb, stride_b,
+      //    reinterpret_cast<const rocblas_half *>(&beta_half),
+      //    reinterpret_cast<rocblas_half *>(c->opaque()), ldc, stride_c,
+      //    batch_count);
+
     }
     case blas::DataType::kBF16:
       return DoBlasInternalStatus(
