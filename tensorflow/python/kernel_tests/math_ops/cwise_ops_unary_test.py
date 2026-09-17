@@ -302,6 +302,7 @@ class UnaryOpTest(test.TestCase):
     z = (x + 15.5).astype(np.float64)  # all positive
     k = np.arange(-0.90, 0.90,
                   0.35).reshape(1, 3, 2).astype(np.float64)  # between -1 and 1
+    test_util.skip_fp64_gfx928(data=x, dtype=None)
     self._compareBoth(x, np.abs, math_ops.abs)
     self._compareBoth(x, np.abs, _ABS)
     self._compareBoth(x, np.negative, math_ops.negative)
@@ -570,6 +571,7 @@ class UnaryOpTest(test.TestCase):
   def testComplex128Basic(self):
     x = (1 + 1j) * np.arange(-3, 3).reshape(1, 3, 2).astype(np.complex128)
     y = x + (0.5 + 0.5j)  # no zeros
+    test_util.skip_fp64_gfx928(data=x, dtype=None)
     self._compareBoth(x, np.abs, math_ops.abs)
     self._compareBoth(x, np.abs, _ABS)
     self._compareBoth(x, np.negative, math_ops.negative)

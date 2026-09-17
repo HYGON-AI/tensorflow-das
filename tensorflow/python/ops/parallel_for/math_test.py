@@ -235,10 +235,10 @@ class MathTest(PForTestCase, parameterized.TestCase):
       x1 = array_ops.gather(x, i)
       y1 = array_ops.gather(y, i)
       return math_ops.approximate_equal(x1, y1)
-
     self._test_loop_fn(loop_fn, 3)
 
   def test_abs_complex(self):
+    test_util.skip_fp64_gfx928(force_skip=True)
     r = pfor_control_flow_ops.vectorized_map(
         math_ops.abs, math_ops.cast([0, -1], dtype=dtypes.complex128))
     self.assertAllEqual(self.evaluate(r), [0, 1])

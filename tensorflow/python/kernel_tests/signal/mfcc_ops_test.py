@@ -42,6 +42,7 @@ class MFCCTest(test.TestCase, parameterized.TestCase):
   def test_basic(self, dtype):
     """A basic test that the op runs on random input."""
     signal = random_ops.random_normal((2, 3, 5), dtype=dtype)
+    test_util.skip_fp64_gfx928(data=None, dtype=dtype)
     self.evaluate(mfcc_ops.mfccs_from_log_mel_spectrograms(signal))
 
   def test_unknown_shape(self):

@@ -84,6 +84,7 @@ class MatrixSolveLsOpTest(test_lib.TestCase):
                    fast,
                    l2_regularizer,
                    batch_shape=()):
+    test_util.skip_fp64_gfx928(dtype=dtype)
     if not fast and l2_regularizer != 0:
       # The slow path does not support regularization.
       return

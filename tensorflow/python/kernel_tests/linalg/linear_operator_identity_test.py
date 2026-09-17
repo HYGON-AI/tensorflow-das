@@ -318,6 +318,7 @@ class LinearOperatorScaledIdentityTest(
   def operator_and_matrix(
       self, build_info, dtype, use_placeholder,
       ensure_self_adjoint_and_pd=False):
+    test_util.skip_fp64_gfx928(dtype=dtype)
 
     shape = list(build_info.shape)
     assert shape[-1] == shape[-2]

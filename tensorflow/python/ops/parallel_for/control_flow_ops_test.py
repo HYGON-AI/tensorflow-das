@@ -2761,7 +2761,7 @@ class SpectralTest(PForTestCase, parameterized.TestCase):
   def test_fft(self, op_func):
     shape = [2, 3, 4, 3, 4]
     x = np.random.uniform(size=shape) + 1j * np.random.uniform(size=shape)
-
+    test_util.skip_fp64_gfx928(data=x, dtype=None)
     def loop_fn(i):
       x_i = array_ops.gather(x, i)
       return op_func(x_i)

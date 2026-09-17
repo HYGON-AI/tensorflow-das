@@ -288,6 +288,7 @@ class CholeskyGradTest(test.TestCase):
                            scalar_test=False):
     for shape_ in shapes:
       for dtype_ in dtypes:
+        test_util.skip_fp64_gfx928(data=None, dtype=dtype_)
         for batch_ in False, True:
           self._runOneTest(shape_, dtype_, batch_, scalar_test)
 

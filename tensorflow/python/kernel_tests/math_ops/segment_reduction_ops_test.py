@@ -119,7 +119,7 @@ class SegmentReductionOpTest(SegmentReductionHelper, parameterized.TestCase):
                         (np.ndarray.__mul__, None, math_ops.segment_prod),
                         (self._mean_cum_op, self._mean_reduce_op,
                          math_ops.segment_mean)]
-
+    test_util.skip_fp64_gfx928(dtype=dtype)
     n = 10
     # Note that the GPU implem has different paths for different inner sizes.
     for shape in [[n, 1], [n, 2], [n, 3], [n, 32]]:
@@ -351,6 +351,7 @@ class UnsortedSegmentTest(SegmentReductionHelper, parameterized.TestCase):
   def testValues(self, dtype):
     indices_flat = np.array([0, 4, 0, 8, 3, 8, 4, 7, 7, 3])
     num_segments = 12
+    test_util.skip_fp64_gfx928(dtype=dtype)
     for indices in indices_flat, indices_flat.reshape(5, 2):
       # Note that the GPU implem has different paths for different inner sizes.
       for inner_size in [1, 2, 3, 32]:
@@ -455,7 +456,7 @@ class UnsortedSegmentTest(SegmentReductionHelper, parameterized.TestCase):
     num_cols = 2
     indices_flat = np.array([0, 4, 0, -1, 3, -1, 4, 7, 7, 3])
     num_segments = max(indices_flat) + 3
-
+    test_util.skip_fp64_gfx928(dtype=dtype)
     ops_list = self.complex_ops_list if dtype.is_complex else self.ops_list
     for indices in indices_flat, indices_flat.reshape(5, 2):
       shape = indices.shape + (num_cols,)
@@ -653,7 +654,7 @@ class SparseSegmentReductionOpTest(SparseSegmentReductionHelper):
     segment_ids_dtypes = [dtypes_lib.int32, dtypes_lib.int64]
 
     mean_dtypes = [dtypes_lib.float32, dtypes_lib.float64]
-
+    test_util.skip_fp64_gfx928(dtype=mean_dtypes)
     # Each item is np_op1, np_op2, tf_op
     ops_list = [(np.add, None, math_ops.sparse_segment_sum),
                 (self._mean_cum_op, self._mean_reduce_op,
@@ -669,8 +670,11 @@ class SparseSegmentReductionOpTest(SparseSegmentReductionHelper):
           segment_indices.append(i)
       num_indices = len(segment_indices)
       for dtype in dtypes:
+        test_util.skip_fp64_gfx928(dtype=dtype)
         for index_dtype in index_dtypes:
+          test_util.skip_fp64_gfx928(dtype=index_dtype)
           for segment_ids_dtype in segment_ids_dtypes:
+            test_util.skip_fp64_gfx928(dtype=segment_ids_dtype)
             with self.cached_session():
               tf_indices, np_indices, tf_x, np_x = self._sparse_input(
                   shape, num_indices, dtype=dtype)

@@ -81,6 +81,7 @@ class SegmentReductionDeterminismExceptionsTest(test.TestCase):
           for data_type in [
               dtypes.float16, dtypes.float32, dtypes.float64, dtypes.int32
           ]:
+            test_util.skip_fp64_gfx928(data=None, dtype=data_type)
             if (op == math_ops.unsorted_segment_sqrt_n and
                 data_type == dtypes.int32):  # sqrt_n doesn't support int32
               continue

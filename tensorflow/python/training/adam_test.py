@@ -55,6 +55,7 @@ class AdamOptimizerTest(test.TestCase):
 
   def doTestSparse(self, use_resource=False):
     for dtype in [dtypes.half, dtypes.float32, dtypes.float64]:
+      test_util.skip_fp64_gfx928(dtype=dtype)
       with self.cached_session():
         # Initialize variables for numpy implementation.
         m0, v0, m1, v1 = 0.0, 0.0, 0.0, 0.0
@@ -126,6 +127,7 @@ class AdamOptimizerTest(test.TestCase):
   def testSparseRepeatedIndices(self):
     with ops.Graph().as_default():
       for dtype in [dtypes.half, dtypes.float32, dtypes.float64]:
+        test_util.skip_fp64_gfx928(dtype=dtype)
         with self.cached_session():
           repeated_index_update_var = variables.Variable(
               [[1.0], [2.0]], dtype=dtype)

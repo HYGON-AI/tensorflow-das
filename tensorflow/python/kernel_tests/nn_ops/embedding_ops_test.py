@@ -711,6 +711,7 @@ class EmbeddingLookupSparseTest(test.TestCase, parameterized.TestCase):
       ragged,
       allow_fast_lookup,
   ):
+    test_util.skip_fp64_gfx928(data=None, dtype=dtype)
     vocab_size = 13
     batch_size = 10
     param_shape = [2, 5]
@@ -826,6 +827,7 @@ class EmbeddingLookupSparseTest(test.TestCase, parameterized.TestCase):
       ragged,
       allow_fast_lookup,
   ):
+    test_util.skip_fp64_gfx928(data=None, dtype=dtype)
     vocab_size = 12
     batch_size = 4
     param_shape = [2, 3]

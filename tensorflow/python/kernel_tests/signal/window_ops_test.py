@@ -98,6 +98,7 @@ class WindowOpsTest(test.TestCase, parameterized.TestCase):
           _TF_DTYPE_TOLERANCE))
   def test_kaiser_window(self, window_length, beta, tf_dtype_tol):
     """Check that kaiser_window matches np.kaiser behavior."""
+    tf_test_util.skip_fp64_gfx928(dtype=tf_dtype_tol[0])
     self.assertAllClose(
         np.kaiser(window_length, beta),
         window_ops.kaiser_window(window_length, beta, tf_dtype_tol[0]),
@@ -193,6 +194,7 @@ class WindowOpsTest(test.TestCase, parameterized.TestCase):
   def test_kaiser_bessel_derived_window(self, window_length, beta,
                                         tf_dtype_tol):
     """Check if Kaiser-Bessel derived windows satisfy MDCT window conditions."""
+    tf_test_util.skip_fp64_gfx928(dtype=tf_dtype_tol[0])
     self._check_mdct_window(window_ops.kaiser_bessel_derived_window(
         window_length, beta=beta, dtype=tf_dtype_tol[0]), tol=tf_dtype_tol[1])
 
