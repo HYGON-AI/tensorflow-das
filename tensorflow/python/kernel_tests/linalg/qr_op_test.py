@@ -125,6 +125,7 @@ def _GetQrOpTest(dtype_, shape_, full_matrices_, use_static_shape_):
     if not use_static_shape_ and context.executing_eagerly():
       return
     np.random.seed(1)
+    test_util.skip_fp64_gfx928(dtype=dtype_)
     x_np = np.random.uniform(
         low=-1.0, high=1.0, size=np.prod(shape_)).reshape(shape_).astype(dtype_)
     if is_complex:

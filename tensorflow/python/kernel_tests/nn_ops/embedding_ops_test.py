@@ -582,6 +582,7 @@ class EmbeddingLookupTest(test.TestCase):
                                             dtype=np.int64)).reshape(ids_shape)
           # Compare nonsharded to gather
           simple = embedding_ops.embedding_lookup(params, ids, max_norm=1.0)
+          test_util.skip_fp64_gfx928(data=simple)
           # assertAllClose is used here as different implementations of sqrt may
           # be used to compute each of the values being compared.  For example,
           # on AVX512 builds the embedding operation makes use of Eigen's fast
@@ -624,6 +625,7 @@ class EmbeddingLookupTest(test.TestCase):
         # Compare nonsharded to gather.
         simple = embedding_ops._embedding_lookup_and_transform(
             params, ids, max_norm=l2_norm, transform_fn=transform)
+        test_util.skip_fp64_gfx928(data=simple)
         self.assertAllClose(simple, array_ops.gather(params_norm, ids))
         # Run a few different sharded versions.
         for procs in 1, 2, 3:

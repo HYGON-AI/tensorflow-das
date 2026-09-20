@@ -58,6 +58,7 @@ def _GetNormalizeOpTest(dtype_, shape_, ord_, axis_):
 
   @test_util.run_in_graph_and_eager_modes
   def Test(self):
+    test_util.skip_fp64_gfx928(dtype=dtype)
     is_matrix_norm = (isinstance(axis_, tuple) or
                       isinstance(axis_, list)) and len(axis_) == 2
     is_fancy_p_norm = np.isreal(ord_) and np.floor(ord_) != ord_

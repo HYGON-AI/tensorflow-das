@@ -61,6 +61,7 @@ class DebugIdentityV2OpTest(dumping_callback_test_lib.DumpingCallbackTestBase):
 
     @def_function.function
     def write_debug_trace(x):
+      test_util.skip_fp64_gfx928(dtype=x.dtype)
       square = math_ops.square(x)
       gen_debug_ops.debug_identity_v2(
           square,

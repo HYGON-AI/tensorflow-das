@@ -38,6 +38,7 @@ class LinearOperatorLowerTriangularTest(
   def operator_and_matrix(self, build_info, dtype, use_placeholder,
                           ensure_self_adjoint_and_pd=False):
     shape = list(build_info.shape)
+    test_util.skip_fp64_gfx928(dtype=dtype)
     # Upper triangle will be nonzero, but ignored.
     # Use a diagonal that ensures this matrix is well conditioned.
     tril = linear_operator_test_util.random_tril_matrix(

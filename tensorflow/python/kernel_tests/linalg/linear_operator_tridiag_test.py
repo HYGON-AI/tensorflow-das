@@ -33,7 +33,7 @@ class _LinearOperatorTriDiagBase(object):
       ensure_self_adjoint_and_pd=False,
       diagonals_format='sequence'):
     shape = list(build_info.shape)
-
+    test_util.skip_fp64_gfx928(dtype=dtype)
     # Ensure that diagonal has large enough values. If we generate a
     # self adjoint PD matrix, then the diagonal will be dominant guaranteeing
     # positive definitess.

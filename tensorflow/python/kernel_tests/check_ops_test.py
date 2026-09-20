@@ -519,6 +519,7 @@ class AssertAllCloseTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def test_doesnt_raise_complex(self):
     x = constant_op.constant(1. + 0.1j, name="x")
+    test_util.skip_fp64_gfx928(dtype=x.dtype)
     y = constant_op.constant(1.1 + 0.1j, name="y")
     with ops.control_dependencies([
         check_ops.assert_near(

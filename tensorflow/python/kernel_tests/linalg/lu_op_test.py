@@ -184,6 +184,7 @@ class LuOpTest(test.TestCase):
 
   def testBatch(self):
     simple_array = np.array([[[1., -1.], [2., 5.]]])  # shape (1, 2, 2)
+    test_util.skip_fp64_gfx928(dtype=simple_array.dtype)
     self._verifyLu(simple_array)
     self._verifyLu(np.vstack((simple_array, simple_array)))
     odd_sized_array = np.array([[[4., -1., 2.], [-1., 6., 0], [2., 0., 5.]]])

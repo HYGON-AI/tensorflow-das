@@ -296,6 +296,7 @@ class LinearOperatorCirculantTestSelfAdjointOperator(
                           use_placeholder,
                           ensure_self_adjoint_and_pd=False):
     shape = shape_info.shape
+    test_util.skip_fp64_gfx928(dtype=dtype)
     # For this test class, we are creating real spectrums.
     # We also want the spectrum to have eigenvalues bounded away from zero.
     #

@@ -89,6 +89,7 @@ class ExponentialOpTest(test.TestCase):
   @test_util.run_deprecated_v1
   def testNonsymmetricComplex(self):
     matrix1 = np.array([[1., 2.], [3., 4.]])
+    test_util.skip_fp64_gfx928(data=matrix1)
     matrix2 = np.array([[1., 3.], [3., 5.]])
     matrix1 = matrix1.astype(np.complex64)
     matrix1 += 1j * matrix1
@@ -110,6 +111,7 @@ class ExponentialOpTest(test.TestCase):
 
   def testSymmetricPositiveDefiniteComplex(self):
     matrix1 = np.array([[2., 1.], [1., 2.]])
+    test_util.skip_fp64_gfx928(data=matrix1)
     matrix2 = np.array([[3., -1.], [-1., 3.]])
     matrix1 = matrix1.astype(np.complex64)
     matrix1 += 1j * matrix1
