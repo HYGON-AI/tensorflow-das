@@ -44,17 +44,22 @@ bool ComputeInNhwcEnabled(DataType data_type, se::Stream* stream,
       data_type == DT_HALF && stream->GetCudaComputeCapability().IsAtLeast(
                                   se::CudaComputeCapability::VOLTA) || 
                                   UseNhwcLayoutForConvOnRocm(stream);
-#if GOOGLE_CUDA
+
   bool use_nhwc_tf32 = data_type == DT_FLOAT &&
                        stream->GetCudaComputeCapability().IsAtLeast(
-                           se::CudaComputeCapability::AMPERE) &&
-                       tensorflow::tensor_float_32_execution_enabled();
+                           se::CudaComputeCapability::AMPERE) ||
+                        UseNhwcLayoutForConvOnRocm(stream);
+
+  bool use_nhwc_bf16 = data_type == DT_BFLOAT16 && UseNhwcLayoutForConvOnRocm(stream);
+
+#if GOOGLE_CUDA
+  use_nhwc_tf32 = use_nhwc_tf32 &&  tensorflow::tensor_float_32_execution_enabled();
 
   if (use_4d_tensor) {
     return use_nhwc_fp16 || use_nhwc_tf32 || use_nhwc_bf16;
   }
 #else
-  return use_nhwc_fp16;
+  return use_nhwc_fp16 || use_nhwc_tf32 || use_nhwc_bf16;
 #endif
 #else
   // fast NHWC implementation is a CUDA/ROCM only feature
