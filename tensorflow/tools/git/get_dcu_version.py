@@ -28,9 +28,8 @@ def dtk_version_value():
        dtk_path=os.getenv('ROCM_PATH')
        dtk_version_path = os.path.join(dtk_path, '.info', "version-dev")
        with open(dtk_version_path, 'r',encoding='utf-8') as file:
-           lines = file.readlines()
-       dtk_version="dtk"+lines[0][:-2].replace(".", "")
-       return dtk_version
+           version = file.readline().strip().split("-", 1)[0]
+       return "dtk" + version.replace(".", "")
     except Exception:
        return UNKNOWN
 
@@ -40,7 +39,7 @@ def tfwhl_name():
         sha =  sha_value(tf_root)[0:7]
         abi = "abi" + abi_value()
         dtk_version = dtk_version_value()
-        whl_name = "das1.1.git" + sha + "." + abi +"." + dtk_version
+        whl_name = "das" + "." + "opt1" +"." + dtk_version
         return whl_name
     except Exception:
         return UNKNOWN
