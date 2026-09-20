@@ -29,7 +29,6 @@ import json
 import os
 import shutil
 import subprocess
-import get_dcu_version
 
 def parse_branch_ref(filename):
   """Given a filename of a .git/HEAD file return ref path.
@@ -156,11 +155,6 @@ def get_git_version(git_base_path, git_tag_override):
     A bytestring representing the git version
   """
   unknown_label = b"unknown"
-  dcu_version = get_dcu_version.dcu_version()
-  dcu_version_info = get_dcu_version.tfwhl_name()
-  dcu_version_path = "tensorflow/tools/git/dcu_version_info.py"
-  with open(dcu_version_path, 'w') as f:
-      f.write(f"{dcu_version_info}")
   try:
     # Force to bytes so this works on python 2 and python 3
     val = bytes(
@@ -182,9 +176,9 @@ def get_git_version(git_base_path, git_tag_override):
       abbrev_commit = split_val[-1]
       val = version_separator.join(
           [bytes(git_tag_override, "utf-8"), b"0", abbrev_commit])
-    return (val + b"_" + dcu_version.encode('utf-8')) if val else (unknown_label + b"_" + dcu_version.encode('utf-8'))
+    return val if val else unknown_label
   except (subprocess.CalledProcessError, OSError):
-    return (unknown_label + b"_" + dcu_version.encode('utf-8'))
+    return unknown_label
 
 
 def write_version_info(filename, git_version):

@@ -37,10 +37,10 @@ def dtk_version_value():
 def tfwhl_name():
     try:
         tf_root = Path(__file__).parent
-        sha = "git" + sha_value(tf_root)[0:7]
+        sha =  sha_value(tf_root)[0:7]
         abi = "abi" + abi_value()
         dtk_version = dtk_version_value()
-        whl_name = "+" + sha + "." + abi +"." + dtk_version
+        whl_name = "das1.1.git" + sha + "." + abi +"." + dtk_version
         return whl_name
     except Exception:
         return UNKNOWN
@@ -52,3 +52,14 @@ def dcu_version():
         return dcu_version
     except Exception:
         return UNKNOWN
+def replace_name(file_path, line_number, newline):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+    if 0 < line_number <= len(lines):
+        lines[line_number - 1] = newline + '\n'
+    with open(file_path, 'w') as file:
+        file.writelines(lines)
+
+if __name__ == "__main__":
+    replace_name(file_path="./tensorflow/python/client/pywrap_tf_session.py", line_number=33, newline = f'__dcu_version__ = "2.13.1+{tfwhl_name()}"')
+    replace_name(file_path="./tensorflow/tools/pip_package/setup.py", line_number=324, newline = f"version=_VERSION.replace('-', '')+str('+{tfwhl_name()}'),")

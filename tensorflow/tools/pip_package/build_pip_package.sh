@@ -221,7 +221,6 @@ function prepare_src() {
   cp tensorflow/tools/pip_package/MANIFEST.in ${TMPDIR}
   cp tensorflow/tools/pip_package/README ${TMPDIR}/README.md
   cp tensorflow/tools/pip_package/setup.py ${TMPDIR}
-  cp tensorflow/tools/git/dcu_version_info.py ${TMPDIR}
 
   rm -f ${TMPDIR}/tensorflow/libtensorflow_framework.so
   rm -f ${TMPDIR}/tensorflow/libtensorflow_framework.so.[0-9].*
