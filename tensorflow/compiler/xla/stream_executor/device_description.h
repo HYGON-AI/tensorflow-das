@@ -180,10 +180,10 @@ class RocmComputeCapability {
         "gfx941",  // MI300
         "gfx942",  // MI300
         "gfx1030",  // Navi21
-        "gfx926",  //KONGMING
-        "gfx928",  //KONGMING-E
-        "gfx936",  //BOWEN
-        "gfx938",  //NMZ
+        "gfx926",  // KONGMING
+        "gfx928",  // KONGMING-E
+        "gfx936",  // BOWEN
+        "gfx938",  // NMZ
     };
   }
   std::set<std::string> gfx_versions_with_nhwc_layout_support() {

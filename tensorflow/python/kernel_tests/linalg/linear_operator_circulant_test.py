@@ -381,6 +381,7 @@ class LinearOperatorCirculantTestHermitianSpectrum(
                           use_placeholder,
                           ensure_self_adjoint_and_pd=False):
     shape = shape_info.shape
+    test_util.skip_fp64_gfx928(dtype=dtype)
     spectrum = _spectrum_for_symmetric_circulant(
         spectrum_shape=self._shape_to_spectrum_shape(shape),
         d=1,
@@ -454,6 +455,7 @@ class LinearOperatorCirculantTestNonHermitianSpectrum(
                           dtype,
                           use_placeholder,
                           ensure_self_adjoint_and_pd=False):
+    test_util.skip_fp64_gfx928(dtype=dtype)
     del ensure_self_adjoint_and_pd
     shape = shape_info.shape
     # Will be well conditioned enough to get accurate solves.
@@ -716,6 +718,7 @@ class LinearOperatorCirculant2DTestHermitianSpectrum(
                           dtype,
                           use_placeholder,
                           ensure_self_adjoint_and_pd=False):
+    test_util.skip_fp64_gfx928(dtype=dtype)
     shape = shape_info.shape
     spectrum = _spectrum_for_symmetric_circulant(
         spectrum_shape=self._shape_to_spectrum_shape(shape),
@@ -775,6 +778,7 @@ class LinearOperatorCirculant2DTestNonHermitianSpectrum(
                           dtype,
                           use_placeholder,
                           ensure_self_adjoint_and_pd=False):
+    test_util.skip_fp64_gfx928(dtype=dtype)
     del ensure_self_adjoint_and_pd
     shape = shape_info.shape
     # Will be well conditioned enough to get accurate solves.

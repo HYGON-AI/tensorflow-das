@@ -171,6 +171,7 @@ class FFTOpsTest(BaseFFTOpsTest, parameterized.TestCase):
       itertools.product(VALID_FFT_RANKS, range(3),
                         (np.complex64, np.complex128)))
   def test_basic(self, rank, extra_dims, np_type):
+    test_util.skip_fp64_gfx928(dtype=np_type)
     dims = rank + extra_dims
     tol = 1e-4 if np_type == np.complex64 else 1e-8
     self._compare(
@@ -180,6 +181,7 @@ class FFTOpsTest(BaseFFTOpsTest, parameterized.TestCase):
   @parameterized.parameters(itertools.product(
       (1,), range(3), (np.complex64, np.complex128)))
   def test_large_batch(self, rank, extra_dims, np_type):
+    test_util.skip_fp64_gfx928(dtype=np_type)
     dims = rank + extra_dims
     tol = 1e-4 if np_type == np.complex64 else 5e-5
     self._compare(
@@ -199,6 +201,7 @@ class FFTOpsTest(BaseFFTOpsTest, parameterized.TestCase):
   @parameterized.parameters(itertools.product(
       VALID_FFT_RANKS, range(3), (np.complex64, np.complex128)))
   def test_placeholder(self, rank, extra_dims, np_type):
+    test_util.skip_fp64_gfx928(dtype=np_type)
     if context.executing_eagerly():
       return
     tol = 1e-4 if np_type == np.complex64 else 1e-8
@@ -211,6 +214,7 @@ class FFTOpsTest(BaseFFTOpsTest, parameterized.TestCase):
   @parameterized.parameters(itertools.product(
       VALID_FFT_RANKS, range(3), (np.complex64, np.complex128)))
   def test_random(self, rank, extra_dims, np_type):
+    test_util.skip_fp64_gfx928(dtype=np_type)
     tol = 1e-4 if np_type == np.complex64 else 5e-6
     dims = rank + extra_dims
     def gen(shape):
@@ -228,6 +232,7 @@ class FFTOpsTest(BaseFFTOpsTest, parameterized.TestCase):
       [128, 256, 512, 1024, 127, 255, 511, 1023],
       (np.complex64, np.complex128)))
   def test_random_1d(self, rank, dim, np_type):
+    test_util.skip_fp64_gfx928(dtype=np_type)
     has_gpu = test.is_gpu_available(cuda_only=True)
     tol = {(np.complex64, True): 1e-4,
            (np.complex64, False): 1e-2,
@@ -258,6 +263,7 @@ class FFTOpsTest(BaseFFTOpsTest, parameterized.TestCase):
   @parameterized.parameters(itertools.product(
       VALID_FFT_RANKS, range(2), (np.float32, np.float64)))
   def test_grad_simple(self, rank, extra_dims, np_type):
+    test_util.skip_fp64_gfx928(dtype=np_type)
     tol = 1e-4 if np_type == np.float32 else 1e-10
     dims = rank + extra_dims
     re = np.ones(shape=(4,) * dims, dtype=np_type) / 10.0
@@ -379,6 +385,7 @@ class RFFTOpsTest(BaseFFTOpsTest, parameterized.TestCase):
       (1,), range(3), (64, 128), (np.float32, np.float64)))
   def test_large_batch(self, rank, extra_dims, size, np_rtype):
     np_ctype = np.complex64 if np_rtype == np.float32 else np.complex128
+    test_util.skip_fp64_gfx928(dtype=np_ctype)
     tol = 1e-4 if np_rtype == np.float32 else 1e-5
     dims = rank + extra_dims
     inner_dim = size // 2 + 1

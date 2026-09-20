@@ -1268,9 +1268,13 @@ static tsl::StatusOr<T> GetSimpleAttribute(hipDevice_t device,
   // (e.g. rocBLAS alone needs~200 MB to put its kernels as of ROCm 4.1)
   const uint64_t RESERVED_GFX908 = 1048576 * 512;
   const uint64_t RESERVED_GFX9_X = 1048576 * 1024;
-  if (gcnArchName.substr(0, 6) == "gfx908") {
+  if (gcnArchName.substr(0, 6) == "gfx908" ||
+      gcnArchName.substr(0, 6) == "gfx906" ||
+      gcnArchName.substr(0, 6) == "gfx926" ||
+      gcnArchName.substr(0, 6) == "gfx936" ) {
     *reserve = RESERVED_GFX908;
   } else if (gcnArchName.substr(0, 6) == "gfx90a" ||
+             gcnArchName.substr(0, 6) == "gfx928" ||
              gcnArchName.substr(0, 6) == "gfx940" ||
              gcnArchName.substr(0, 6) == "gfx941" ||
              gcnArchName.substr(0, 6) == "gfx942" ) {

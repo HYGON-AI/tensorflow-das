@@ -90,6 +90,44 @@ from tensorflow.python.util import traceback_utils
 from tensorflow.python.util.compat import collections_abc
 from tensorflow.python.util.protobuf import compare
 from tensorflow.python.util.tf_export import tf_export
+from tensorflow.python.client import device_lib
+
+def skip_fp64_gfx928(data=None, dtype=None, force_skip=False, device_info=False):
+
+    if data is not None and hasattr(data, 'dtype'):
+        # check data dtype
+        if data.dtype not in [dtypes.complex64, np.double, dtypes.complex128, np.complex64, np.float64, np.complex128, dtypes.float64]:
+            return
+        if data.dtype in [dtypes.complex64, dtypes.complex128, np.double, np.float64, np.complex64, np.complex128, dtypes.float64]:
+            device_info = device_lib.list_local_devices()
+            #  check device info
+            if "K100_AI" in str(device_info):
+                print("K100_AI {} skip test".format(data.dtype))
+                raise unittest.SkipTest("this dtype are not supported on K100_AI")
+
+
+    elif dtype is not None:
+        if dtype not in [dtypes.complex64, dtypes.complex128, np.double, np.float64, np.complex64, np.complex128, dtypes.float64]:
+            return
+        if dtype in [dtypes.complex64, dtypes.complex128, np.float64, np.double, np.complex64, np.complex128, dtypes.float64]:
+            device_info = device_lib.list_local_devices()
+            # check device info
+            if "K100_AI" in str(device_info):
+                print("K100_AI{} skip test".format(dtype))
+                raise unittest.SkipTest("this dtype are not supported on K100_AI")
+                #return
+    elif force_skip == True:
+        device_info = device_lib.list_local_devices()
+          # check device info
+        if "K100_AI" in str(device_info):
+
+            print("K100_AI{} skip test".format(dtype))
+            raise unittest.SkipTest("this dtype are not supported on K100_AI")
+    elif device_info == True:
+        if "K100_AI" in str(device_lib.list_local_devices()):
+            return True
+        else:
+            return False
 
 
 # If the below import is made available through the BUILD rule, then this

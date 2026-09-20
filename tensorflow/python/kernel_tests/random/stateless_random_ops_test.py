@@ -120,6 +120,8 @@ def float_cases(shape_dtypes=(None,)):
       return a
 
   for dtype in dtypes.float16, dtypes.bfloat16, dtypes.float32, dtypes.float64:
+    if dtype == dtypes.float64 and test_util.skip_fp64_gfx928(device_info=True):
+      return
     for shape_dtype in shape_dtypes:
       for shape in (), (3,), (2, 5):
         for name, stateless_op, stateful_op, kwargs in cases:

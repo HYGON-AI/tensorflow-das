@@ -24,7 +24,7 @@ from tensorflow.python.ops.numpy_ops import np_array_ops
 from tensorflow.python.ops.numpy_ops import np_arrays
 from tensorflow.python.ops.numpy_ops import np_math_ops
 from tensorflow.python.platform import test
-
+from tensorflow.python.framework import test_util
 
 class MathTest(test.TestCase, parameterized.TestCase):
 
@@ -55,6 +55,7 @@ class MathTest(test.TestCase, parameterized.TestCase):
       for fn in self.array_transforms:
         arg1 = fn(a)
         arg2 = fn(b)
+        test_util.skip_fp64_gfx928(data=None, dtype=math_fun(arg1, arg2).dtype)
         self.match(
             math_fun(arg1, arg2),
             np_fun(arg1, arg2),
@@ -137,6 +138,7 @@ class MathTest(test.TestCase, parameterized.TestCase):
     def run_test(a):
       for fn in self.array_transforms:
         arg1 = fn(a)
+        test_util.skip_fp64_gfx928(data=None, dtype=math_fun(arg1).dtype)
         self.match(
             math_fun(arg1), np_fun(arg1), msg='{}({})'.format(name, arg1))
 

@@ -21,7 +21,7 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops.linalg import linalg
 from tensorflow.python.ops.linalg.sparse import conjugate_gradient
 from tensorflow.python.platform import test
-
+from tensorflow.python.framework import test_util
 
 def _add_test(test_class, op_name, testcase_name, fn):
   test_name = "_".join(["test", op_name, testcase_name])
@@ -37,6 +37,7 @@ class ConjugateGradientTest(test.TestCase):
 def _get_conjugate_gradient_test(dtype_, use_static_shape_, shape_):
 
   def _test_conjugate_gradient(self):
+    test_util.skip_fp64_gfx928(dtype=dtype_)
     np.random.seed(1)
     a_np = np.random.uniform(
         low=-1.0, high=1.0, size=np.prod(shape_)).reshape(shape_).astype(dtype_)

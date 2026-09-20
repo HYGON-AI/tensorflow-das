@@ -55,7 +55,7 @@ xla::Status CompileAndPrintLlvmIr(const std::string& hlo_text,
   tensorflow::se::CudaComputeCapability cuda_compute_capability;
   cuda_compute_capability.major = sm / 10;
   cuda_compute_capability.minor = sm % 10;
-  tensorflow::se::RocmComputeCapability rocm_compute_capability("gfx908");
+  tensorflow::se::RocmComputeCapability rocm_compute_capability("gfx928");
 #if GOOGLE_CUDA
   std::string target_triple = "nvptx64-nvidia-cuda";
   std::string datalayout = "nvptx64-nvidia-cuda";

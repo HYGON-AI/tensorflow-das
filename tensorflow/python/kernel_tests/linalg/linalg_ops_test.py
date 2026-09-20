@@ -594,6 +594,7 @@ class EighTridiagonalTest(test.TestCase, parameterized.TestCase):
   @parameterized.parameters((np.float32), (np.float64), (np.complex64),
                             (np.complex128))
   def test_small(self, dtype):
+    test_util.skip_fp64_gfx928(data=None, dtype=dtype)
     for n in [1, 2, 3]:
       alpha = np.ones([n], dtype=dtype)
       beta = np.ones([n - 1], dtype=dtype)
@@ -604,6 +605,7 @@ class EighTridiagonalTest(test.TestCase, parameterized.TestCase):
   @parameterized.parameters((np.float32), (np.float64), (np.complex64),
                             (np.complex128))
   def test_toeplitz(self, dtype):
+    test_util.skip_fp64_gfx928(data=None, dtype=dtype)
     n = 8
     for a, b in [[2, -1], [1, 0], [0, 1], [-1e10, 1e10], [-1e-10, 1e-10]]:
       alpha = a * np.ones([n], dtype=dtype)
@@ -615,6 +617,7 @@ class EighTridiagonalTest(test.TestCase, parameterized.TestCase):
   @parameterized.parameters((np.float32), (np.float64), (np.complex64),
                             (np.complex128))
   def test_random_uniform(self, dtype):
+    test_util.skip_fp64_gfx928(data=None, dtype=dtype)
     for n in [8, 50]:
       alpha = np.random.uniform(size=(n,)).astype(dtype)
       beta = np.random.uniform(size=(n - 1,)).astype(dtype)
@@ -625,6 +628,7 @@ class EighTridiagonalTest(test.TestCase, parameterized.TestCase):
   @parameterized.parameters((np.float32), (np.float64), (np.complex64),
                             (np.complex128))
   def test_select(self, dtype):
+    test_util.skip_fp64_gfx928(data=None, dtype=dtype)
     n = 4
     alpha = np.random.uniform(size=(n,)).astype(dtype)
     beta = np.random.uniform(size=(n - 1,)).astype(dtype)

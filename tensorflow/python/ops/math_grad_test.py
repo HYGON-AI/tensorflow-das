@@ -67,6 +67,7 @@ class AbsOpTest(test.TestCase):
 
   def _testGrad(self, shape, dtype=None, max_error=None, bias=None, sigma=None):
     np.random.seed(7)
+    test_util.skip_fp64_gfx928(data=None, dtype=dtype)
     if dtype in (dtypes.complex64, dtypes.complex128):
       value = math_ops.complex(
           self._biasedRandN(

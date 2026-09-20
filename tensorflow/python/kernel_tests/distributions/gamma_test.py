@@ -189,6 +189,7 @@ class GammaTest(test.TestCase):
   def testGammaStd(self):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
+    test_util.skip_fp64_gfx928(data=beta_v, dtype=None)
     gamma = gamma_lib.Gamma(concentration=alpha_v, rate=beta_v)
     self.assertEqual(gamma.stddev().get_shape(), (3,))
     if not stats:
@@ -200,6 +201,7 @@ class GammaTest(test.TestCase):
     alpha_v = np.array([1.0, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])
     gamma = gamma_lib.Gamma(concentration=alpha_v, rate=beta_v)
+    test_util.skip_fp64_gfx928(data=beta_v, dtype=None)
     self.assertEqual(gamma.entropy().get_shape(), (3,))
     if not stats:
       return
@@ -371,7 +373,7 @@ class GammaTest(test.TestCase):
 
     alpha1 = np.array([0.4])
     beta1 = np.array([0.5, 1., 1.5, 2., 2.5, 3.])
-
+    test_util.skip_fp64_gfx928(data=beta1, dtype=None)
     # Build graph.
     g0 = gamma_lib.Gamma(concentration=alpha0, rate=beta0)
     g1 = gamma_lib.Gamma(concentration=alpha1, rate=beta1)

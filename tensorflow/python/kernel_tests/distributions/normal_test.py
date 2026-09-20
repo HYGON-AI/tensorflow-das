@@ -342,6 +342,7 @@ class NormalTest(test.TestCase):
     mu = self._rng.randn(batch_size)
     sigma = self._rng.rand(batch_size) + 1.0
     p = np.linspace(0., 1.0, batch_size - 2).astype(np.float64)
+    test_util.skip_fp64_gfx928(data=p)
     # Quantile performs piecewise rational approximation so adding some
     # special input values to make sure we hit all the pieces.
     p = np.hstack((p, np.exp(-33), 1. - np.exp(-33)))
@@ -363,6 +364,7 @@ class NormalTest(test.TestCase):
     self.assertAllClose(expected_x, self.evaluate(x), atol=0.)
 
   def _baseQuantileFiniteGradientAtDifficultPoints(self, dtype):
+    test_util.skip_fp64_gfx928(dtype=dtype)
     g = ops.Graph()
     with g.as_default():
       mu = variables.Variable(dtype(0.0))

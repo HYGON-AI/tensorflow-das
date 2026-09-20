@@ -186,6 +186,7 @@ class DCTOpsTest(parameterized.TestCase, test.TestCase):
   def test_random(self, dct_type, norm, shape, dtype):
     """Test randomly generated batches of data."""
     # "ortho" normalization is not implemented for type I.
+    test_util.skip_fp64_gfx928(data=None, dtype=dtype)
     if dct_type == 1 and norm == "ortho":
       return
     with self.session():
@@ -203,6 +204,7 @@ class DCTOpsTest(parameterized.TestCase, test.TestCase):
       [np.float32, np.float64]))
   def test_with_dynamic_dimensions(self, dct_type, norm, shape, dtype):
     # "ortho" normalization is not implemented for type I.
+    test_util.skip_fp64_gfx928(data=None, dtype=dtype)
     if dct_type == 1 and norm == "ortho":
       return
     signals = np.random.rand(*shape).astype(dtype)

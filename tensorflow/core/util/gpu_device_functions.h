@@ -978,7 +978,7 @@ __device__ inline T GpuAtomicAddShared(T* ptr, T value) {
   return GpuAtomicAdd(ptr, value);
 }
 
-#if __gfx908__ || __gfx90a__ || __gfx940__ || __gfx941__ || __gfx942__
+#if __gfx908__ || __gfx928__ || __gfx936__ || __gfx90a__ || __gfx940__ || __gfx941__ || __gfx942__
 __device__ float GpuAtomicAddShared(float* dst, float val) {
   atomicAdd(dst, val);
   return val;

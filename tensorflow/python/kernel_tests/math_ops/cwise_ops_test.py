@@ -1120,6 +1120,7 @@ class IsFiniteInfNanTest(test.TestCase):
 
   def testSqrt(self):
     for dtype in [np.float16, np.float32, np.float64]:
+      test_util.skip_fp64_gfx928(data=None, dtype=dtype)
       fi = np.finfo(dtype)
       for size in [1, 3, 4, 7, 8, 63, 64, 65]:
         # For float32 Eigen uses Carmack's fast vectorized sqrt algorithm.

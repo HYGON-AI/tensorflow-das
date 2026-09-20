@@ -60,6 +60,7 @@ class LogarithmOpTest(test.TestCase):
     matrix1 = np.array([[1., 2.], [3., 4.]])
     matrix2 = np.array([[1., 3.], [3., 5.]])
     matrix1 = matrix1.astype(np.complex64)
+    test_util.skip_fp64_gfx928(data=matrix1)
     matrix1 += 1j * matrix1
     matrix2 = matrix2.astype(np.complex64)
     matrix2 += 1j * matrix2
@@ -74,6 +75,7 @@ class LogarithmOpTest(test.TestCase):
     matrix1 = np.array([[2., 1.], [1., 2.]])
     matrix2 = np.array([[3., -1.], [-1., 3.]])
     matrix1 = matrix1.astype(np.complex64)
+    test_util.skip_fp64_gfx928(data=matrix1)
     matrix1 += 1j * matrix1
     matrix2 = matrix2.astype(np.complex64)
     matrix2 += 1j * matrix2
@@ -111,6 +113,7 @@ class LogarithmOpTest(test.TestCase):
         matrix = np.random.uniform(
             low=-1.0, high=1.0,
             size=np.prod(shape)).reshape(shape).astype(np.complex64)
+        test_util.skip_fp64_gfx928(data=matrix)
         self._verifyLogarithmComplex(matrix)
 
   @test_util.run_in_graph_and_eager_modes(use_gpu=True)
@@ -122,6 +125,7 @@ class LogarithmOpTest(test.TestCase):
         matrix = np.random.uniform(
             low=-1.0, high=1.0,
             size=np.prod(shape)).reshape(shape).astype(np.complex128)
+        test_util.skip_fp64_gfx928(data=matrix)
         self._verifyLogarithmComplex(matrix)
 
   @test_util.run_in_graph_and_eager_modes(use_gpu=True)

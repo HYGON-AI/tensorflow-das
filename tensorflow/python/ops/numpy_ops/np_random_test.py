@@ -26,7 +26,7 @@ from tensorflow.python.ops.numpy_ops import np_dtypes
 from tensorflow.python.ops.numpy_ops import np_math_ops
 from tensorflow.python.ops.numpy_ops import np_random
 from tensorflow.python.platform import test
-
+from tensorflow.python.framework import test_util
 
 class SeedTest(test.TestCase):
 
@@ -188,6 +188,7 @@ class RandNDistriutionTest(test.TestCase):
         self.assertEqual(output.shape, tuple(args))
         default_dtype = (
             np.float64 if np_dtypes.is_allow_float64() else np.float32)
+        test_util.skip_fp64_gfx928(data=None, dtype=default_dtype)
         self.assertEqual(output.dtype.as_numpy_dtype, default_dtype)
 
       if np.prod(args):  # Don't bother with empty arrays.

@@ -222,6 +222,7 @@ class RaggedDispatchTest(test_util.TensorFlowTestCase, parameterized.TestCase):
                              expected_dtype=None,
                              **extra_args):
     x = ragged_tensor.convert_to_tensor_or_ragged_tensor(x)
+    test_util.skip_fp64_gfx928(data=x)
     random_seed.set_random_seed(1234)
     result = op(x, **extra_args)
 
@@ -355,6 +356,7 @@ class RaggedDispatchTest(test_util.TensorFlowTestCase, parameterized.TestCase):
            'use_kwargs': {'x': 'labels', 'y': 'logits'}},
       ])  # pyformat: disable
   def testBinaryElementwiseOp(self, x, y, op=math_ops.add, **extra_args):
+    test_util.skip_fp64_gfx928(data=y)
     use_kwargs = extra_args.pop('use_kwargs', {})
 
     def compute(x, y):

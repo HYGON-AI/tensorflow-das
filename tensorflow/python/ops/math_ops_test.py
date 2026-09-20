@@ -124,6 +124,7 @@ class ReduceTest(test_util.TensorFlowTestCase):
     x = [[1., 2., 1., 1.], [1., 1., 0., 1.]]
     self.assertEqual(self.evaluate(math_ops.reduce_std(x)), 0.5)
     x_np = np.array(x)
+    test_util.skip_fp64_gfx928(data=x_np, dtype=None)
     self.assertEqual(np.std(x_np), 0.5)
     self.assertEqual(self.evaluate(math_ops.reduce_std(x_np)), 0.5)
 
@@ -137,6 +138,7 @@ class ReduceTest(test_util.TensorFlowTestCase):
                   (np.array([0 - 1j, 0 + 1j], "complex64"), dtypes.float32),
                   (np.array([0 - 1j, 0 + 1j], "complex128"), dtypes.float64)]
     for y, dtype in complex_ys:
+      test_util.skip_fp64_gfx928(data=None, dtype=dtype)
       y_result = math_ops.reduce_std(y)
       self.assertEqual(np.std(y), 1.0)
       self.assertEqual(self.evaluate(y_result), 1.0)
@@ -364,6 +366,7 @@ class ModTest(test_util.TensorFlowTestCase):
   def testFloat(self):
     x = [0.5, 0.7, 0.3]
     for dtype in [np.float32, np.double]:
+      test_util.skip_fp64_gfx928(data=None, dtype=dtype)
       # Test scalar and vector versions.
       for denom in [x[0], [x[0]] * 3]:
         x_np = np.array(x, dtype=dtype)
@@ -603,6 +606,7 @@ class DivAndModTest(test_util.TensorFlowTestCase):
 
   def floatTestData(self):
     nums = np.arange(-10, 10, .25).reshape(80, 1)
+    test_util.skip_fp64_gfx928(data=nums, dtype=None)
     divs = np.arange(-3, 0, .25).reshape(1, 12)
     return nums, divs
 
@@ -643,6 +647,7 @@ class DivAndModTest(test_util.TensorFlowTestCase):
   def testFloorModFloat(self):
     nums, divs = self.floatTestData()
     for dtype in [np.float16, np.float32, np.float64]:
+      test_util.skip_fp64_gfx928(data=None, dtype=dtype)
       x = nums.astype(dtype)
       y = divs.astype(dtype)
       tf_result = math_ops.floormod(x, y)

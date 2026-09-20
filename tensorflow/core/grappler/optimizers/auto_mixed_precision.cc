@@ -1024,7 +1024,7 @@ std::unordered_map<string, DeviceProperties> GetDevices(Cluster* cluster) {
 #elif TENSORFLOW_USE_ROCM
   gpu_device_properies.set_vendor("Advanced Micro Devices, Inc");
   gpu_device_properies.mutable_environment()->insert(
-      {"architecture", "gfx908"});
+      {"architecture", "gfx928"});
 #endif
   devices.emplace(std::make_pair("/job:localhost/replica:0/task:0/device:GPU:0",
                                  gpu_device_properies));

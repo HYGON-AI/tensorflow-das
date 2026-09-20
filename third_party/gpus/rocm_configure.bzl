@@ -338,7 +338,7 @@ def _find_libs(repository_ctx, rocm_config, hipfft_or_rocfft, miopen_path, rccl_
       Map of library names to structs of filename and path
     """
     libs_paths = [
-        (name, _rocm_lib_paths(repository_ctx, name, path))
+        (name, _rocm_lib_paths(repository_ctx, name, path+"/roctracer" if name=="roctracer64" else path))
         for name, path in [
             ("amdhip64", rocm_config.rocm_toolkit_path),
             ("rocblas", rocm_config.rocm_toolkit_path),

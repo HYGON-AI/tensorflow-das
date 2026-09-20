@@ -92,6 +92,7 @@ class NdtriTest(test.TestCase):
       return
 
     p = np.linspace(0., 1.0, 50).astype(np.float64)
+    test_util.skip_fp64_gfx928(data=p, dtype=None)
     # Quantile performs piecewise rational approximation so adding some
     # special input values to make sure we hit all the pieces.
     p = np.hstack((p, np.exp(-32), 1. - np.exp(-32), np.exp(-2),
@@ -128,6 +129,7 @@ class NdtriTest(test.TestCase):
             1. - np.exp(-32.),
             1.,
         ]).astype(dtype))
+    test_util.skip_fp64_gfx928(data=p, dtype=None)
     # Not having the lambda sanitizer means we'd get an `IndexError` whenever
     # the user supplied function has default args.
     _, grads = _value_and_gradient(
@@ -361,7 +363,7 @@ class ErfInvTest(test.TestCase):
         return
 
       x = np.linspace(0., 1.0, 50).astype(np.float64)
-
+      test_util.skip_fp64_gfx928(data=x, dtype=None)
       expected_x = special.erfinv(x)
       x = special_math.erfinv(x)
       self.assertAllClose(expected_x, self.evaluate(x), atol=0.)

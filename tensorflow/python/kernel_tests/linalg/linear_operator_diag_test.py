@@ -51,6 +51,7 @@ class LinearOperatorDiagTest(
       self, build_info, dtype, use_placeholder,
       ensure_self_adjoint_and_pd=False):
     shape = list(build_info.shape)
+    test_util.skip_fp64_gfx928(dtype=dtype)
     diag = linear_operator_test_util.random_sign_uniform(
         shape[:-1], minval=1., maxval=2., dtype=dtype)
 

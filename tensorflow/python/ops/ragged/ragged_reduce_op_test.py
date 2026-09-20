@@ -630,6 +630,8 @@ class RaggedReduceOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
       ),
   )
   def testReduce(self, ragged_reduce_op, rt_input, axis, keepdims, expected):
+    if test_util.skip_fp64_gfx928(device_info=True):
+        return
     rt_input = ragged_factory_ops.constant(rt_input)
     reduced = ragged_reduce_op(rt_input, axis, keepdims=keepdims)
     self.assertAllEqual(reduced, expected)
@@ -670,6 +672,8 @@ class RaggedReduceOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
     self.assertEqualWithNan(self.evaluate(reduced), expected)
 
   def testStdNan(self):
+    if test_util.skip_fp64_gfx928(device_info=True):
+        return
     rt_as_list = [[0, 1, 1, 0], [4], [], [5, 6], [7], [8, 9]]
     expected = ([std(0, 1, 1, 0), std(4), std(), std(5, 6), std(7), std(8, 9)])
     rt_input = ragged_factory_ops.constant(rt_as_list)
