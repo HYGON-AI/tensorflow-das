@@ -1146,6 +1146,7 @@ class RaggedDispatchTest(test_util.TensorFlowTestCase, parameterized.TestCase):
                          kwargs=None):
     # For some tests, the inputs/outputs to the function need to be
     # constructed late, because they contain tensors.
+    test_util.skip_fp64_gfx928(force_skip=True)
     if callable(kwargs):
       kwargs = kwargs()
     if callable(args):

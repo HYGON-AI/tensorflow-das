@@ -28,19 +28,18 @@ def dtk_version_value():
        dtk_path=os.getenv('ROCM_PATH')
        dtk_version_path = os.path.join(dtk_path, '.info', "version-dev")
        with open(dtk_version_path, 'r',encoding='utf-8') as file:
-           lines = file.readlines()
-       dtk_version="dtk"+lines[0][:-2].replace(".", "")
-       return dtk_version
+           version = file.readline().strip().split("-", 1)[0]
+       return "dtk" + version.replace(".", "")
     except Exception:
        return UNKNOWN
 
 def tfwhl_name():
     try:
         tf_root = Path(__file__).parent
-        sha = "git" + sha_value(tf_root)[0:7]
+        sha =  sha_value(tf_root)[0:7]
         abi = "abi" + abi_value()
         dtk_version = dtk_version_value()
-        whl_name = "+" + sha + "." + abi +"." + dtk_version
+        whl_name = "das" + "." + "opt1" +"." + dtk_version
         return whl_name
     except Exception:
         return UNKNOWN
@@ -52,3 +51,14 @@ def dcu_version():
         return dcu_version
     except Exception:
         return UNKNOWN
+def replace_name(file_path, line_number, newline):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+    if 0 < line_number <= len(lines):
+        lines[line_number - 1] = newline + '\n'
+    with open(file_path, 'w') as file:
+        file.writelines(lines)
+
+if __name__ == "__main__":
+    replace_name(file_path="./tensorflow/python/client/pywrap_tf_session.py", line_number=33, newline = f'__dcu_version__ = "2.13.1+{tfwhl_name()}"')
+    replace_name(file_path="./tensorflow/tools/pip_package/setup.py", line_number=324, newline = f"version=_VERSION.replace('-', '')+str('+{tfwhl_name()}'),")

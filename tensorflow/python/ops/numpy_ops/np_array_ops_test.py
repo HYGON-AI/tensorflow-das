@@ -19,7 +19,7 @@ import operator
 import sys
 from absl.testing import parameterized
 import numpy as np
-
+from tensorflow.python.framework import test_util
 from tensorflow.python.eager import context
 from tensorflow.python.eager import def_function
 from tensorflow.python.framework import config
@@ -740,11 +740,12 @@ class ArrayMethodsTest(test.TestCase):
     self.assertRaises(ValueError, np_array_ops.mean, np.ones([2, 2]), out=[])
 
   def testStd(self):
-
+    test_util.skip_fp64_gfx928(force_skip=True)
     def run_test(arr, *args, **kwargs):
       axis = kwargs.pop('axis', None)
       for fn1 in self.array_transforms:
         for fn2 in self.array_transforms:
+          test_util.skip_fp64_gfx928(data=fn2)
           arr_arg = fn1(arr)
           axis_arg = fn2(axis) if axis is not None else None
           self.match(

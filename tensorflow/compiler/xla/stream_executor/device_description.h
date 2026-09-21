@@ -187,7 +187,8 @@ class RocmComputeCapability {
     };
   }
   std::set<std::string> gfx_versions_with_nhwc_layout_support() {
-    return {"gfx908", "gfx90a", "gfx940", "gfx941", "gfx942"};
+    return {"gfx908", "gfx90a", "gfx940", "gfx941", "gfx942",
+            "gfx926", "gfx928", "gfx936", "gfx938"};
   }
   std::set<std::string> gfx_versions_with_fast_bf16_support() {
     return {"gfx908", "gfx90a", "gfx940", "gfx941", "gfx942"};

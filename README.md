@@ -1,3 +1,28 @@
+<!-- DAS-INTRO:BEGIN -->
+
+> [!IMPORTANT]
+> **tensorflow-das** 是面向 DAS 架构的 tensorflow 下游适配发行版，
+> 基于 [ROCm/tensorflow-upstream](https://github.com/ROCm/tensorflow-upstream) 的 `1a34d8ff22cc6b53e2176106c39f3726d7f76905` 基线构建并集成 DAS 支持。
+>
+> 本项目不是 tensorflow 官方发行版，而是基于 [ROCm/tensorflow-upstream](https://github.com/ROCm/tensorflow-upstream) 二次开发；ROCm tensorflow 源自 [tensorflow/tensorflow](https://github.com/tensorflow/tensorflow) 二次开发。
+
+- **目标架构：** tensorflow 2.13.1
+- **上游分支：** r2.13-rocm-enhanced
+- **上游版本：** 1a34d8ff22cc6b53e2176106c39f3726d7f76905
+- **上游基线：** `https://github.com/ROCm/tensorflow-upstream/commit/1a34d8ff22cc6b53e2176106c39f3726d7f76905`
+- **上游许可：** Apache-2.0
+- **源码编译：** [BUILDING.md](docs/das/BUILDING.md)
+- **已知问题：** [BUILDING.md 中的已知问题](docs/das/BUILDING.md#已知问题)
+- **Python 发布包名：** `tensorflow-das`
+- **Python 导入名：** `tensorflow`
+
+> `tensorflow-das` 与上游 `tensorflow` 会安装同名 `tensorflow` 模块，
+> 请勿在同一虚拟环境或容器中混装。
+
+<!-- DAS-INTRO:END -->
+
+---
+
 <div align="center">
   <img src="https://www.tensorflow.org/images/tf_logo_horizontal.png">
 </div>
@@ -208,4 +233,9 @@ Learn more about the
 
 ## License
 
-[Apache License 2.0](LICENSE)
+This repository is licensed under the Apache License 2.0. See [LICENSE](LICENSE). Some files are adapted from tensorflow and other third-party sources;
+see [Third-Party Notices](docs/das/THIRD_PARTY_NOTICES.md) for source and modification notices.
+
+HCU adaptations, modifications, and original contributions by Hygon Information Technology Co., Ltd. are licensed under the Apache License, Version 2.0.
+
+Modified by Hygon Information Technology Co., Ltd.

@@ -41,11 +41,6 @@ from setuptools import setup
 from setuptools.command.install import install as InstallCommandBase
 from setuptools.dist import Distribution
 
-dcu_version_path = os.path.join("./dcu_version_info.py")
-with open(dcu_version_path, 'r',encoding='utf-8') as file:
-    lines = file.readlines()
-tfwhl_name = str(lines[0])
-
 # This version string is semver compatible, but incompatible with pip.
 # For pip, we will remove all '-' characters from this string, and use the
 # result for pip.
@@ -326,7 +321,7 @@ headers = (
 
 setup(
     name=project_name,
-    version=_VERSION.replace('-', '') + str(tfwhl_name),
+    version=_VERSION.replace('-', ''),
     description=DOCLINES[0],
     long_description='\n'.join(DOCLINES[2:]),
     long_description_content_type='text/markdown',

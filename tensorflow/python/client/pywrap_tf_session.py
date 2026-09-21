@@ -30,12 +30,8 @@ from tensorflow.python.util import tf_stack
 # https://pybind11.readthedocs.io/en/stable/advanced/cast/strings.html#returning-c-strings-to-python
 # pylint: disable=undefined-variable
 __version__ = str(get_version())
-try:
-  __dcu_version__ = str(get_git_version()).split('_',1)[1]
-  __git_version__ = str(get_git_version()).split('_',1)[0]
-except Exception:
-  __dcu_version__ = "unknown"
-  __git_version__ = str(get_git_version())
+__dcu_version__ = "unknown"
+__git_version__ = str(get_git_version())
 __compiler_version__ = str(get_compiler_version())
 __cxx11_abi_flag__ = get_cxx11_abi_flag()
 __cxx_version__ = get_cxx_version()

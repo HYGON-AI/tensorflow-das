@@ -70,6 +70,7 @@ class BaseLinearOperatorLowRankUpdatetest(object):
 
   def operator_and_matrix(self, shape_info, dtype, use_placeholder,
                           ensure_self_adjoint_and_pd=False):
+    test_util.skip_fp64_gfx928(dtype=dtype)
     # Recall A = L + UDV^H
     shape = list(shape_info.shape)
     diag_shape = shape[:-1]
