@@ -48,7 +48,7 @@ limitations under the License.
 #include "tensorflow/tsl/platform/errors.h"
 #include "tensorflow/tsl/platform/statusor.h"
 #include "tensorflow/tsl/protobuf/dnn.pb.h"
-
+#include "tensorflow/tsl/util/env_var.h"
 
 namespace xla {
 namespace gpu {
@@ -1011,10 +1011,9 @@ class GemmRewriterVisitor : public DfsHloRewriteVisitor {
   StatusOr<absl::string_view> GetNonFp8GemmCustomCallTarget(
       const HloInstruction &instr,
       const GemmBackendConfig &gemm_backend_config) const {
-    if (!instr.GetModule()
-             ->config()
-             .debug_options()
-             .xla_gpu_enable_cublaslt()) {
+    bool use_cublas_lt = false;
+    tsl::ReadBoolFromEnvVar("USE_CUBLAS_LT", false, &use_cublas_lt);
+    if (!use_cublas_lt && !instr.GetModule()->config().debug_options().xla_gpu_enable_cublaslt()) {
       // cublasLt is not enabled.
       return absl::string_view(kGemmCallTarget);
     }

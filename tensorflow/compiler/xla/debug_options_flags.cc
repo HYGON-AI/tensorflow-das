@@ -38,7 +38,7 @@ DebugOptions DefaultDebugOptionsIgnoringFlags() {
   opts.set_xla_llvm_enable_invariant_load_metadata(true);
   opts.set_xla_llvm_disable_expensive_passes(false);
   opts.set_xla_backend_optimization_level(3);
-  opts.set_xla_gpu_autotune_level(0);
+  opts.set_xla_gpu_autotune_level(4);
   opts.set_xla_cpu_multi_thread_eigen(true);
   opts.set_xla_gpu_cuda_data_dir("./cuda_sdk_lib");
   opts.set_xla_gpu_asm_extra_flags("");
@@ -74,7 +74,7 @@ DebugOptions DefaultDebugOptionsIgnoringFlags() {
 
   // Note: CublasLt will be used for FP8 GEMMs regardless of the value of this
   // flag.
-  opts.set_xla_gpu_enable_cublaslt(true);
+  opts.set_xla_gpu_enable_cublaslt(false);
 
   // TODO(b/258036887): Enable once CUDA Graphs are fully supported.
   opts.set_xla_gpu_cuda_graph_level(0);

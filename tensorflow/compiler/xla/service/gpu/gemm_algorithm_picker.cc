@@ -43,6 +43,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/util.h"
 #include "tensorflow/tsl/protobuf/autotuning.pb.h"
 #include "tensorflow/tsl/util/proto/proto_utils.h"
+#include "tensorflow/tsl/util/env_var.h"
 
 namespace xla {
 namespace gpu {
@@ -107,10 +108,14 @@ class GemmAutotuner {
     TF_ASSIGN_OR_RETURN(rz_buffers_, RedzoneBuffers::FromInstruction(
                         *gemm, autotune_config_, stream_.get(), debug_options,
                         RedzoneBuffers::kAllInputsAllOutputs));
-    
-    return IsCublasLtMatmul(*gemm)
-           ? TuneGpuBlasLt(gemm->shape(), gemm_config)
-           : TuneGpuBlas(gemm->shape(), gemm_config);
+    bool use_cublas_lt = false;
+    tsl::ReadBoolFromEnvVar("USE_CUBLAS_LT", false, &use_cublas_lt);
+
+    if (use_cublas_lt && IsCublasLtMatmul(*gemm)) {
+      return TuneGpuBlasLt(gemm->shape(), gemm_config);
+    } else {
+      return TuneGpuBlas(gemm->shape(), gemm_config);
+    }
   }
 
  private:
