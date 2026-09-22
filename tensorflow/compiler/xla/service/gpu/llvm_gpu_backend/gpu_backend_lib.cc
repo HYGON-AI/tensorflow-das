@@ -72,6 +72,12 @@ limitations under the License.
 #include "rocm/rocm_config.h"
 #endif
 
+// DTK: begin
+#if (TENSORFLOW_USE_ROCM && USE_GCVM)
+#include "include/gcvm.h"
+#endif
+// DTK: end
+
 namespace xla {
 namespace gpu {
 namespace {
@@ -829,6 +835,123 @@ StatusOr<std::vector<uint8_t>> EmitModuleToHsaco(
   return hsaco;
 }
 
+// DTK: begin
+#if (TENSORFLOW_USE_ROCM && USE_GCVM)
+// Link with ROCm-Device-Libs.
+Status LinkModule(llvm::Module* module, GpuVersion gpu_version,
+                  const HloModuleConfig& hlo_module_config,
+                  const std::string& device_bitcode_dir_path,
+                  TargetModuleLinker module_linker) {
+  TF_RETURN_IF_ERROR(module_linker(module, gpu_version, hlo_module_config,
+                                   device_bitcode_dir_path));
+
+  return OkStatus();
+}
+
+// Optimize and emit the given module to HSA Code Object by GCVM.
+StatusOr<std::vector<uint8_t>> OptimizeAndEmitModuleToHsacoByGCVM(
+    llvm::Module* module, std::string& gfx_version, int32_t opt_level, int inline_threshold) {
+  auto* env = tsl::Env::Default();
+  std::vector<std::string> tempdir_vector;
+  env->GetLocalTempDirectories(&tempdir_vector);
+  if (tempdir_vector.empty()) {
+    return xla::InternalError(
+        "Unable to locate a temporary directory for compile-time artifacts.");
+  }
+  std::string tempdir_name = tempdir_vector.front();
+  VLOG(1) << "Compile-time artifacts located at: " << tempdir_name;
+
+  bool keep_tempfiles = false;
+  TF_CHECK_OK(tsl::ReadBoolFromEnvVar("TF_ROCM_KEEP_XLA_TEMPFILES",
+                                      /*default_val=*/false, &keep_tempfiles));
+  // Prepare filenames for all stages of compilation:
+  // IR, binary ISA, and HSACO.
+  std::string random_number = std::to_string(tsl::random::New64());
+  std::string ir_filename =
+      absl::StrCat(module->getModuleIdentifier(), random_number + ".ll");
+  std::string ir_path = tsl::io::JoinPath(tempdir_name, ir_filename);
+
+  std::string hsaco_filename =
+      absl::StrCat(module->getModuleIdentifier(), random_number + ".hsaco");
+  std::string hsaco_path = tsl::io::JoinPath(tempdir_name, hsaco_filename);
+
+  std::error_code ec;
+
+  // Dump LLVM IR.
+  std::unique_ptr<llvm::raw_fd_ostream> ir_fs(
+      new llvm::raw_fd_ostream(ir_path, ec, llvm::sys::fs::OF_None));
+  module->print(*ir_fs, nullptr);
+  ir_fs->flush();
+
+  // Read ir file.
+  std::ifstream input_ir_file(ir_path);
+
+  if (!input_ir_file.is_open())
+    LOG(ERROR) << "Can't open file: " << ir_path;
+
+  std::string ir_source((std::istreambuf_iterator<char>(input_ir_file)),
+                        (std::istreambuf_iterator<char>()));
+
+  // Compile LLVM IR and generate hsaco by GCVM.
+  gcvmProgram gcvm_prog;
+
+  if (GCVM_SUCCESS != gcvmCreateProgram(&gcvm_prog))
+    LOG(ERROR) << "[GCVM](E) Failed to create program.\n";
+
+  if (GCVM_SUCCESS != gcvmAddModuleToProgram(gcvm_prog, ir_source.c_str(), ir_source.size(), "", SourceType::LLVMIR))
+    LOG(ERROR) << "[GCVM](E) Failed to add module to program.\n";
+
+  if (GCVM_SUCCESS != gcvmSetArch(gcvm_prog, gfx_version.c_str()))
+    LOG(ERROR) << "[GCVM](E) Failed to set arch.\n";
+
+  if (GCVM_SUCCESS != gcvmSetOptLevel(gcvm_prog, opt_level))
+    LOG(ERROR) << "[GCVM](E) Failed to set OptLevel.\n";
+
+  if (GCVM_SUCCESS != gcvmCompileProgram(gcvm_prog, 0, nullptr, ResultType::Hsaco))
+    LOG(ERROR) << "[GCVM](E) Failed to compile " << ir_path << ".\n";
+
+  size_t result_size;
+  if (GCVM_SUCCESS != gcvmGetCompiledResultSize(gcvm_prog, &result_size))
+    LOG(ERROR) << "[GCVM](E) Failed to get compile result size.\n";
+
+  char *result = (char*)malloc(result_size);
+  if (!result)
+    LOG(ERROR) << "[GCVM](E) Faile to malloc for result.\n";
+
+  if (GCVM_SUCCESS != gcvmGetCompiledResult(gcvm_prog, result))
+    LOG(ERROR) << "[GCVM](E) Failed to get compile result.\n";
+
+  std::ofstream out_file(hsaco_path, std::ios::binary);
+  if (!out_file)
+    LOG(ERROR) << "[GCVM](E) Failed to open file for writing.\n";
+
+  out_file.write(result, result_size);
+  out_file.close();
+
+  if (GCVM_SUCCESS != gcvmDestroyProgram(&gcvm_prog))
+    LOG(ERROR) << "[GCVM](E) Failed to destory program.\n";
+
+  input_ir_file.close();
+
+  // Read HSACO.
+  std::ifstream hsaco_file(hsaco_path, std::ios::binary | std::ios::ate);
+  std::ifstream::pos_type hsaco_file_size = hsaco_file.tellg();
+
+  std::vector<uint8_t> hsaco(hsaco_file_size);
+  hsaco_file.seekg(0, std::ios::beg);
+  hsaco_file.read(reinterpret_cast<char*>(&hsaco[0]), hsaco_file_size);
+  hsaco_file.close();
+
+  // Remove temp files.
+  if (!keep_tempfiles) {
+    remove(ir_path.c_str());
+    remove(hsaco_path.c_str());
+  }
+  return hsaco;
+}
+#endif // (TENSORFLOW_USE_ROCM && USE_GCVM)
+// DTK: end
+
 // Links ROCm-Device-Libs into the given module if the module needs it.
 Status LinkROCDLIfNecessary(llvm::Module* module, std::string gcn_arch_name,
                             const std::string& rocdl_dir_path) {
@@ -937,6 +1060,7 @@ void AMDGPUBackendInit(const HloModuleConfig& hlo_module_config) {
   llvm_ir::InitializeLLVMCommandLineOptions(
       hlo_module_config.debug_options().xla_backend_extra_options());
 
+#if (!TENSORFLOW_USE_ROCM || !USE_GCVM) // DTK
   // Initialize the AMDGPU target; it's the only target we link with, so call
   // its specific initialization functions instead of the catch-all
   // InitializeAll*.
@@ -950,6 +1074,7 @@ void AMDGPUBackendInit(const HloModuleConfig& hlo_module_config) {
 
   llvm::PassRegistry* registry = llvm::PassRegistry::getPassRegistry();
   InitializePasses(registry);
+#endif // DTK (!TENSORFLOW_USE_ROCM || !USE_GCVM)
 }
 
 }  // namespace
@@ -1009,6 +1134,27 @@ StatusOr<std::vector<uint8_t>> CompileToHsaco(
       ofs.close();
     }
 
+// DTK: begin
+#if (TENSORFLOW_USE_ROCM && USE_GCVM)
+    // Link with ROCm-Device-Libs.
+    TF_RETURN_IF_ERROR(LinkModule(module, gpu_version, hlo_module_config,
+                                  rocdl_dir_path, AMDGPUTargetModuleLinker));
+
+    if (hlo_module_config.debug_options().xla_gpu_dump_llvmir()) {
+      LOG(WARNING) << "LLVM IR DUMP is NOT available for using GCVM.";
+    }
+
+    int32_t opt_level =
+      hlo_module_config.debug_options().xla_backend_optimization_level();
+
+    std::string gfx_version = compute_capability->gfx_version();
+
+    // Optimize LLVM module and lower it to HSA code object by GCVM.
+    TF_ASSIGN_OR_RETURN(hsaco,
+        OptimizeAndEmitModuleToHsacoByGCVM(module, gfx_version, opt_level,
+                                           kAMDGPUInlineThreshold));
+#else // (TENSORFLOW_USE_ROCM && USE_GCVM)
+// DTK: end
     llvm::Triple default_target_triple("amdgcn--amdhsa-amdgiz");
     // Construct LLVM TargetMachine for AMDGPU.
     std::unique_ptr<llvm::TargetMachine> target_machine =
@@ -1023,6 +1169,8 @@ StatusOr<std::vector<uint8_t>> CompileToHsaco(
 
     // Lower optimized LLVM module to HSA code object.
     TF_ASSIGN_OR_RETURN(hsaco, EmitModuleToHsaco(module, target_machine.get()));
+#endif // DTK (TENSORFLOW_USE_ROCM && USE_GCVM)
+
     HsacoCache::Add(str, hash, gcn_arch_name, hsaco);
   }
   return hsaco;

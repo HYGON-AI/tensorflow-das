@@ -17,6 +17,12 @@ package_group(
     ],
 )
 
+# DTK: Add for GCVM support
+config_setting(
+    name = "use_gcvm",
+    values = {"define": "GCVM_ENABLED=true"},
+)
+
 cc_library(
     name = "llvm_gpu_backend",
     srcs = [
@@ -27,6 +33,10 @@ cc_library(
         "gpu_backend_lib.h",
         "utils.h",
     ],
+    copts = select({  # DTK: Add for GCVM support
+        ":use_gcvm": ["-DUSE_GCVM=1"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//tensorflow/compiler/xla:status_macros",
         "//tensorflow/compiler/xla:statusor",
@@ -66,7 +76,12 @@ cc_library(
     ] + if_rocm_is_configured([
         "@local_config_rocm//rocm:rocm_headers",
         "@llvm-project//llvm:AMDGPUCodeGen",
-    ]),
+    ]) + select({  # DTK: Add for GCVM support
+        ":use_gcvm": [
+        "@gcvm_repo//:gcvm_lib",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 xla_cc_test(
