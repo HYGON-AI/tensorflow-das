@@ -896,10 +896,10 @@ StatusOr<std::vector<uint8_t>> OptimizeAndEmitModuleToHsacoByGCVM(
   gcvmProgram gcvm_prog;
 
   if (GCVM_SUCCESS != gcvmCreateProgram(&gcvm_prog))
-    LOG(ERROR) << "[GCVM](E) Failed to create program.\n";
+    LOG(ERROR) << "[GCVM](E) Failed to create GCVM Program.\n";
 
   if (GCVM_SUCCESS != gcvmAddModuleToProgram(gcvm_prog, ir_source.c_str(), ir_source.size(), "", SourceType::LLVMIR))
-    LOG(ERROR) << "[GCVM](E) Failed to add module to program.\n";
+    LOG(ERROR) << "[GCVM](E) Failed to add module to GCVM Program.\n";
 
   if (GCVM_SUCCESS != gcvmSetArch(gcvm_prog, gfx_version.c_str()))
     LOG(ERROR) << "[GCVM](E) Failed to set arch.\n";
@@ -907,29 +907,33 @@ StatusOr<std::vector<uint8_t>> OptimizeAndEmitModuleToHsacoByGCVM(
   if (GCVM_SUCCESS != gcvmSetOptLevel(gcvm_prog, opt_level))
     LOG(ERROR) << "[GCVM](E) Failed to set OptLevel.\n";
 
-  if (GCVM_SUCCESS != gcvmCompileProgram(gcvm_prog, 0, nullptr, ResultType::Hsaco))
+  // Set NullDiagnosticHandler for compiled module in GCVM
+  int numArgs = 1;
+  const char* gcvmArgs[] = {"enable-null-diagnostic-handler"};
+
+  if (GCVM_SUCCESS != gcvmCompileProgram(gcvm_prog, numArgs, gcvmArgs, ResultType::Hsaco))
     LOG(ERROR) << "[GCVM](E) Failed to compile " << ir_path << ".\n";
 
   size_t result_size;
   if (GCVM_SUCCESS != gcvmGetCompiledResultSize(gcvm_prog, &result_size))
     LOG(ERROR) << "[GCVM](E) Failed to get compile result size.\n";
 
-  char *result = (char*)malloc(result_size);
+  std::unique_ptr<char[]> result(new char[result_size]);
   if (!result)
-    LOG(ERROR) << "[GCVM](E) Faile to malloc for result.\n";
+    LOG(ERROR) << "[GCVM](E) Failed to allocate space for result.\n";
 
-  if (GCVM_SUCCESS != gcvmGetCompiledResult(gcvm_prog, result))
+  if (GCVM_SUCCESS != gcvmGetCompiledResult(gcvm_prog, result.get()))
     LOG(ERROR) << "[GCVM](E) Failed to get compile result.\n";
 
   std::ofstream out_file(hsaco_path, std::ios::binary);
   if (!out_file)
     LOG(ERROR) << "[GCVM](E) Failed to open file for writing.\n";
 
-  out_file.write(result, result_size);
+  out_file.write(result.get(), result_size);
   out_file.close();
 
   if (GCVM_SUCCESS != gcvmDestroyProgram(&gcvm_prog))
-    LOG(ERROR) << "[GCVM](E) Failed to destory program.\n";
+    LOG(ERROR) << "[GCVM](E) Failed to destory GCVM Program.\n";
 
   input_ir_file.close();
 
