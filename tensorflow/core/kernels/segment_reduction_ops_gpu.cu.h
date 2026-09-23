@@ -216,10 +216,6 @@ __global__ void UnsortedSegmentCustomKernel(
     const int64_t input_segment_index = input_index / inner_dim_size;
     const int64_t segment_offset = input_index % inner_dim_size;
     const Index output_segment_index = segment_ids[input_segment_index];
-    if (output_segment_index < 0 ||
-        output_segment_index >= output_outer_dim_size) {
-      continue;
-    }
 
     const T input_value = ldg(input + input_index);
     if (SkipZero && input_value == static_cast<T>(0)) {
@@ -228,6 +224,28 @@ __global__ void UnsortedSegmentCustomKernel(
     const int64_t output_index =
         output_segment_index * inner_dim_size + segment_offset;
     KernelReductionFunctor()(output + output_index, input_value);
+  }
+}
+
+template <typename T, typename Index, typename KernelReductionFunctor, bool SkipZero>
+__global__ void UnsortedSegmentCustomKernel_fp16(
+    const int64_t input_outer_dim_size, const int64_t inner_dim_size,
+    const int64_t output_outer_dim_size, const Index* __restrict__ segment_ids,
+    const T* __restrict__ input, T* __restrict__ output) {
+  const int64_t input_total_size = input_outer_dim_size * inner_dim_size;
+  for (int64_t input_index : GpuGridRangeX(input_total_size)) {
+    const int64_t input_segment_index = input_index / inner_dim_size;
+    const int64_t segment_offset = input_index % inner_dim_size;
+    const Index output_segment_index = segment_ids[input_segment_index];
+
+    const T input_value = ldg(input + input_index);
+    if (SkipZero && input_value == static_cast<T>(0)) {
+        continue;
+    }
+    const int64_t output_index =
+        output_segment_index * inner_dim_size + segment_offset;
+    // KernelReductionFunctor()(output + output_index, input_value);
+    output[output_index] = input_value;
   }
 }
 
@@ -961,7 +979,7 @@ struct UnsortedSegmentFunctor<GPUDevice, T, Index, InitialValueF, ReductionF> {
       const char* env_val = std::getenv("Use_UnsortedSegmentRegisterOptKernel");
       bool use_unsortedSegmentregisteroptkernel = (env_val != nullptr && std::string(env_val) == "1");
       if constexpr (std::is_same<T, float>::value) {
-        if (use_unsortedSegmentregisteroptkernel){
+        if (use_unsortedSegmentregisteroptkernel) {
           TF_CHECK_OK(GpuLaunchKernel(
               UnsortedSegmentRegisterOptKernel<
                   T, Index, ReductionUpdateOp, SkipZero>,
@@ -970,11 +988,27 @@ struct UnsortedSegmentFunctor<GPUDevice, T, Index, InitialValueF, ReductionF> {
               unsorted_segment_ids.data(), data.data(), output.data()));
         } else {
           TF_CHECK_OK(GpuLaunchKernel(
-            UnsortedSegmentCustomKernel<
-                T, Index, ReductionUpdateOp, SkipZero>,
-            config.block_count, config.thread_per_block, 0, d.stream(),
-            input_outer_dim_size, input_inner_dim_size, output_outer_dim_size,
-            unsorted_segment_ids.data(), data.data(), output.data()));
+              UnsortedSegmentCustomKernel<
+                  T, Index, ReductionUpdateOp, SkipZero>,
+              config.block_count, config.thread_per_block, 0, d.stream(),
+              input_outer_dim_size, input_inner_dim_size, output_outer_dim_size,
+              unsorted_segment_ids.data(), data.data(), output.data()));
+        }
+      } else if constexpr (std::is_same<T, Eigen::half>::value) {
+        if (use_unsortedSegmentregisteroptkernel) {
+          TF_CHECK_OK(GpuLaunchKernel(
+              UnsortedSegmentCustomKernel_fp16<
+                  T, Index, ReductionUpdateOp, SkipZero>,
+              config.block_count, config.thread_per_block, 0, d.stream(),
+              input_outer_dim_size, input_inner_dim_size, output_outer_dim_size,
+              unsorted_segment_ids.data(), data.data(), output.data()));
+        } else {
+          TF_CHECK_OK(GpuLaunchKernel(
+              UnsortedSegmentCustomKernel<
+                  T, Index, ReductionUpdateOp, SkipZero>,
+              config.block_count, config.thread_per_block, 0, d.stream(),
+              input_outer_dim_size, input_inner_dim_size, output_outer_dim_size,
+              unsorted_segment_ids.data(), data.data(), output.data()));
         }
       } else {
         TF_CHECK_OK(GpuLaunchKernel(
