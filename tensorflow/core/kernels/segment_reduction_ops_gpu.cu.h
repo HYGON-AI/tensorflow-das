@@ -960,13 +960,22 @@ struct UnsortedSegmentFunctor<GPUDevice, T, Index, InitialValueF, ReductionF> {
       constexpr bool SkipZero = ReduceUpdateOpFor<ReductionF>::is_sum;
       const char* env_val = std::getenv("Use_UnsortedSegmentRegisterOptKernel");
       bool use_unsortedSegmentregisteroptkernel = (env_val != nullptr && std::string(env_val) == "1");
-      if (use_unsortedSegmentregisteroptkernel){
-        TF_CHECK_OK(GpuLaunchKernel(
-            UnsortedSegmentRegisterOptKernel<
+      if constexpr (std::is_same<T, float>::value) {
+        if (use_unsortedSegmentregisteroptkernel){
+          TF_CHECK_OK(GpuLaunchKernel(
+              UnsortedSegmentRegisterOptKernel<
+                  T, Index, ReductionUpdateOp, SkipZero>,
+              config.block_count, config.thread_per_block, 0, d.stream(),
+              input_outer_dim_size, input_inner_dim_size, output_outer_dim_size,
+              unsorted_segment_ids.data(), data.data(), output.data()));
+        } else {
+          TF_CHECK_OK(GpuLaunchKernel(
+            UnsortedSegmentCustomKernel<
                 T, Index, ReductionUpdateOp, SkipZero>,
             config.block_count, config.thread_per_block, 0, d.stream(),
             input_outer_dim_size, input_inner_dim_size, output_outer_dim_size,
             unsorted_segment_ids.data(), data.data(), output.data()));
+        }
       } else {
         TF_CHECK_OK(GpuLaunchKernel(
             UnsortedSegmentCustomKernel<
