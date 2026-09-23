@@ -273,6 +273,7 @@ void GPUUtil::CopyGPUTensorToCPU(Device* gpu_device,
                                  const Tensor* gpu_tensor, Tensor* cpu_tensor,
                                  StatusCallback done) {
   VLOG(1) << "CopyGPUTensorToCPU";
+  static constexpr int64_t kInlineD2HCopyThresholdBytes = 64;
   const DeviceBase::AcceleratorDeviceInfo* dev_info = nullptr;
   se::Stream* send_stream = nullptr;
   Status s = PrepareCopy(gpu_device, device_context, *gpu_tensor, cpu_tensor,
@@ -285,26 +286,36 @@ void GPUUtil::CopyGPUTensorToCPU(Device* gpu_device,
   auto send_device_to_host_stream =
       static_cast<const GPUDeviceContext*>(device_context)
           ->device_to_host_stream();
-  if (send_device_to_host_stream == nullptr) {
-    done(errors::Internal("No send gpu copy-out-stream is available."));
+  const int64_t total_bytes = gpu_tensor->TotalBytes();
+  se::Stream* copy_stream = nullptr;
+  if (total_bytes <= kInlineD2HCopyThresholdBytes) {
+    copy_stream = send_stream;
+  } else {
+    if (send_device_to_host_stream == nullptr) {
+      done(errors::Internal("No send gpu copy-out-stream is available."));
+      return;
+    }
+    // Wait for the sender's main stream to make sure the data are available.
+    send_device_to_host_stream->ThenWaitFor(send_stream);
+    copy_stream = send_device_to_host_stream;
+  }
+
+  if (copy_stream == nullptr) {
+    done(errors::Internal("No gpu stream is available for device-to-host copy."));
     return;
   }
-  // Wait for the sender's main stream to make sure the data are available.
-  send_device_to_host_stream->ThenWaitFor(send_stream);
 
-  const int64_t total_bytes = gpu_tensor->TotalBytes();
   if (total_bytes > 0) {
     void* src_ptr = GetBase(gpu_tensor);
     DeviceMemoryBase gpu_src_ptr(src_ptr, total_bytes);
     void* dst_ptr = GetBase(cpu_tensor);
-    send_device_to_host_stream->ThenMemcpy(dst_ptr, gpu_src_ptr, total_bytes);
+    copy_stream->ThenMemcpy(dst_ptr, gpu_src_ptr, total_bytes);
   }
   // Use of the input may outlive stack scope, so keep a ref.
   TensorReference input_ref(*gpu_tensor);
   dev_info->event_mgr->ThenExecute(
-      send_device_to_host_stream,
-      [send_device_to_host_stream, done, input_ref]() {
-        if (!send_device_to_host_stream->ok()) {
+      copy_stream, [copy_stream, done, input_ref]() {
+        if (!copy_stream->ok()) {
           LOG(FATAL) << "GPU->CPU Memcpy failed";
         }
         input_ref.Unref();
