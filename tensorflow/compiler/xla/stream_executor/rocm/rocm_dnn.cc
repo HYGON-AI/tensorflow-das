@@ -24,7 +24,7 @@ limitations under the License.
 #include "absl/strings/str_format.h"
 #include "absl/types/span.h"
 #include "third_party/eigen3/Eigen/Core"
-#include "rocm/include/miopen/miopen.h"
+#include "miopen/miopen.h"
 #include "tensorflow/compiler/xla/stream_executor/dnn.h"
 #include "tensorflow/compiler/xla/stream_executor/gpu/gpu_activation.h"
 #include "tensorflow/compiler/xla/stream_executor/gpu/gpu_driver.h"

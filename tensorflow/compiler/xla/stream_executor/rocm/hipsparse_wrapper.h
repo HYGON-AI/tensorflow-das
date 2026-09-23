@@ -21,9 +21,9 @@ limitations under the License.
 #define TENSORFLOW_COMPILER_XLA_STREAM_EXECUTOR_ROCM_HIPSPARSE_WRAPPER_H_
 
 #if (TF_ROCM_VERSION >= 50200)
-#include "rocm/include/hipsparse/hipsparse.h"
+#include "hipsparse/hipsparse.h"
 #else
-#include "rocm/include/hipsparse.h"
+#include "hipsparse.h"
 #endif
 #include "tensorflow/compiler/xla/stream_executor/platform/dso_loader.h"
 #include "tensorflow/compiler/xla/stream_executor/platform/port.h"

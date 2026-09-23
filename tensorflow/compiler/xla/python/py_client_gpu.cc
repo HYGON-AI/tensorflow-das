@@ -19,7 +19,7 @@ limitations under the License.
 #include "absl/strings/numbers.h"
 #include "tensorflow/tsl/platform/errors.h"
 #if TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_runtime.h"
+#include "hip/hip_runtime.h"
 #else
 #include "third_party/gpus/cuda/include/cuda.h"
 #include "third_party/gpus/cuda/include/cuda_runtime_api.h"

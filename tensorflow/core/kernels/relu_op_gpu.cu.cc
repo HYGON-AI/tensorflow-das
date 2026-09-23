@@ -27,7 +27,7 @@ limitations under the License.
 #include "tensorflow/core/util/gpu_launch_config.h"
 
 #if TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_fp16.h"
+#include "hip/hip_fp16.h"
 typedef __half2 half2;
 #endif
 

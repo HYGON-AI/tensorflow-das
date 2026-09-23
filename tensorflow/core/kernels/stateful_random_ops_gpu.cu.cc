@@ -16,7 +16,7 @@ limitations under the License.
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 #if TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_runtime.h"
+#include "hip/hip_runtime.h"
 #endif
 
 #define EIGEN_USE_GPU

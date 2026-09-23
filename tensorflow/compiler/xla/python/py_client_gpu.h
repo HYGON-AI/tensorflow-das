@@ -17,7 +17,7 @@ limitations under the License.
 #define TENSORFLOW_COMPILER_XLA_PYTHON_PY_CLIENT_GPU_H_
 
 #if TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_runtime.h"
+#include "hip/hip_runtime.h"
 #else
 #include "third_party/gpus/cuda/include/cuda.h"
 #endif

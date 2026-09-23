@@ -58,7 +58,7 @@ limitations under the License.
 #include "third_party/gpus/cuda/include/cuda.h"
 #include "third_party/gpus/cuda/include/cuda_runtime_api.h"
 #elif TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_runtime.h"
+#include "hip/hip_runtime.h"
 #endif  // GOOGLE_CUDA
 
 namespace tensorflow {

@@ -35,7 +35,7 @@ limitations under the License.
 #if GOOGLE_CUDA
 #include "third_party/gpus/cuda/include/cuda.h"
 #else
-#include "rocm/include/hip/hip_complex.h"
+#include "hip/hip_complex.h"
 #endif
 
 #include "tensorflow/core/platform/types.h"
@@ -978,7 +978,7 @@ __device__ inline T GpuAtomicAddShared(T* ptr, T value) {
   return GpuAtomicAdd(ptr, value);
 }
 
-#if __gfx908__ || __gfx928__ || __gfx936__ || __gfx90a__ || __gfx940__ || __gfx941__ || __gfx942__
+#if __gfx908__ || __gfx928__ || __gfx936__ || __gfx938__|| __gfx90a__ || __gfx940__ || __gfx941__ || __gfx942__
 __device__ float GpuAtomicAddShared(float* dst, float val) {
   atomicAdd(dst, val);
   return val;

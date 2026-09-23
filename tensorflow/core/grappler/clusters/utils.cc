@@ -24,7 +24,7 @@ limitations under the License.
 #endif
 
 #if TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_runtime.h"
+#include "hip/hip_runtime.h"
 #include "absl/strings/str_split.h"
 #endif
 

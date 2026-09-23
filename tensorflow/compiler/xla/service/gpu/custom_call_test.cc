@@ -22,7 +22,7 @@ limitations under the License.
 #include "third_party/gpus/cuda/include/driver_types.h"
 #define PLATFORM "CUDA"
 #elif TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_runtime.h"
+#include "hip/hip_runtime.h"
 #define PLATFORM "ROCM"
 #endif
 

@@ -24,7 +24,7 @@ limitations under the License.
 #include "tensorflow/core/util/gpu_kernel_helper.h"
 
 #if TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_fp16.h"
+#include "hip/hip_fp16.h"
 #else
 #include "third_party/gpus/cuda/include/cuda_fp16.hpp"
 #endif

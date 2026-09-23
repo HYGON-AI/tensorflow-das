@@ -26,7 +26,7 @@ limitations under the License.
 #include "third_party/gpus/cuda/include/cuda.h"
 #endif
 #if TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_runtime.h"
+#include "hip/hip_runtime.h"
 #endif
 
 namespace mlir {

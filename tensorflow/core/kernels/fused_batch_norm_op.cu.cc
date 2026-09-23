@@ -19,7 +19,7 @@ limitations under the License.
 #include "third_party/gpus/cuda/include/cuda.h"
 #endif
 #if TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_fp16.h"
+#include "hip/hip_fp16.h"
 typedef __half2 half2;
 #endif
 #include "tensorflow/core/kernels/fused_batch_norm_op.h"

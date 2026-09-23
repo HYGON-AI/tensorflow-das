@@ -23,7 +23,7 @@ limitations under the License.
 #include "tensorflow/core/framework/tensor_types.h"
 
 #if TENSORFLOW_USE_ROCM
-#include "rocm/include/hip/hip_complex.h"
+#include "hip/hip_complex.h"
 #endif
 
 namespace tensorflow {
