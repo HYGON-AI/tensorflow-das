@@ -53,13 +53,13 @@ def _AsLong(array):
 
 
 @contextlib.contextmanager
-def _set_fused_embedding_lookup_reduce(enabled):
+def _set_fused_embedding_lookup_reduce(mode):
   envvar = embedding_ops._FUSED_EMBEDDING_LOOKUP_REDUCE_ENVVAR  # pylint: disable=protected-access
   previous = os.environ.get(envvar)
-  if enabled:
-    os.environ[envvar] = "1"
-  else:
+  if mode in (False, None, 0, "0", "false", "False", "off"):
     os.environ.pop(envvar, None)
+  else:
+    os.environ[envvar] = str(mode)
   try:
     yield
   finally:
@@ -67,6 +67,20 @@ def _set_fused_embedding_lookup_reduce(enabled):
       os.environ.pop(envvar, None)
     else:
       os.environ[envvar] = previous
+
+
+_FUSED_EMBEDDING_LOOKUP_REDUCE_OP_TYPE = "FusedEmbeddingLookupReduceFlat"
+
+
+def _has_fused_embedding_lookup_reduce_flat():
+  return hasattr(gen_nn_ops, "fused_embedding_lookup_reduce_flat")
+
+
+def _get_fused_embedding_lookup_reduce_ops(graph):
+  return [
+      op for op in graph.get_operations()
+      if op.type == _FUSED_EMBEDDING_LOOKUP_REDUCE_OP_TYPE
+  ]
 
 
 class ScatterAddSubTest(test.TestCase):
@@ -986,8 +1000,8 @@ class EmbeddingLookupSparseTest(test.TestCase, parameterized.TestCase):
 
   @test_util.run_deprecated_v1
   def testEmbeddingLookupSparseFullyDense2DUsesOldPathByDefault(self):
-    if not hasattr(gen_nn_ops, "fused_embedding_lookup_reduce"):
-      self.skipTest("FusedEmbeddingLookupReduce op wrapper not available")
+    if not _has_fused_embedding_lookup_reduce_flat():
+      self.skipTest("FusedEmbeddingLookupReduceFlat op wrapper not available")
     params = constant_op.constant([[1.0], [2.0], [3.0]], dtype=dtypes.float32)
     sp_ids = sparse_tensor.SparseTensor(
         constant_op.constant([[0, 0], [0, 1], [1, 0], [1, 1]], dtypes.int64),
@@ -1001,14 +1015,14 @@ class EmbeddingLookupSparseTest(test.TestCase, parameterized.TestCase):
         )
         op_types = {op.type for op in embedding_sum.graph.get_operations()}
 
-    self.assertNotIn("FusedEmbeddingLookupReduce", op_types)
+    self.assertNotIn(_FUSED_EMBEDDING_LOOKUP_REDUCE_OP_TYPE, op_types)
     self.assertIn("Unique", op_types)
     self.assertIn("SparseSegmentSum", op_types)
 
   @test_util.run_deprecated_v1
   def testEmbeddingLookupSparseFullyDense2DUsesFusedOpWhenEnabled(self):
-    if not hasattr(gen_nn_ops, "fused_embedding_lookup_reduce"):
-      self.skipTest("FusedEmbeddingLookupReduce op wrapper not available")
+    if not _has_fused_embedding_lookup_reduce_flat():
+      self.skipTest("FusedEmbeddingLookupReduceFlat op wrapper not available")
     params = constant_op.constant([[1.0], [2.0], [3.0]], dtype=dtypes.float32)
     sp_ids = sparse_tensor.SparseTensor(
         constant_op.constant([[0, 0], [0, 1], [1, 0], [1, 1]], dtypes.int64),
@@ -1022,14 +1036,14 @@ class EmbeddingLookupSparseTest(test.TestCase, parameterized.TestCase):
         )
         op_types = {op.type for op in embedding_sum.graph.get_operations()}
 
-    self.assertIn("FusedEmbeddingLookupReduce", op_types)
+    self.assertIn(_FUSED_EMBEDDING_LOOKUP_REDUCE_OP_TYPE, op_types)
     self.assertNotIn("Unique", op_types)
     self.assertNotIn("SparseSegmentSum", op_types)
 
   @test_util.run_deprecated_v1
   def testEmbeddingLookupSparseWeightedFullyDense2DDoesNotUseFusedOp(self):
-    if not hasattr(gen_nn_ops, "fused_embedding_lookup_reduce"):
-      self.skipTest("FusedEmbeddingLookupReduce op wrapper not available")
+    if not _has_fused_embedding_lookup_reduce_flat():
+      self.skipTest("FusedEmbeddingLookupReduceFlat op wrapper not available")
     params = constant_op.constant([[1.0], [2.0], [3.0]], dtype=dtypes.float32)
     indices = constant_op.constant([[0, 0], [0, 1], [1, 0], [1, 1]],
                                    dtypes.int64)
@@ -1047,12 +1061,56 @@ class EmbeddingLookupSparseTest(test.TestCase, parameterized.TestCase):
         )
         op_types = {op.type for op in embedding_sum.graph.get_operations()}
 
-    self.assertNotIn("FusedEmbeddingLookupReduce", op_types)
+    self.assertNotIn(_FUSED_EMBEDDING_LOOKUP_REDUCE_OP_TYPE, op_types)
+
+  @test_util.run_deprecated_v1
+  def testEmbeddingLookupSparseFusedEnvGpuPlacesFusedPathOnGpu(self):
+    if not _has_fused_embedding_lookup_reduce_flat():
+      self.skipTest("FusedEmbeddingLookupReduceFlat op wrapper not available")
+    with ops.Graph().as_default():
+      with ops.device("/GPU:0"):
+        params = constant_op.constant(
+            [[1.0], [2.0], [3.0]], dtype=dtypes.float32)
+        sp_ids = sparse_tensor.SparseTensor(
+            constant_op.constant(
+                [[0, 0], [0, 1], [1, 0], [1, 1]], dtypes.int64),
+            constant_op.constant([0, 1, 2, 0], dtypes.int32),
+            constant_op.constant([2, 2], dtypes.int64))
+
+      with _set_fused_embedding_lookup_reduce(1):
+        embedding_sum = embedding_ops.embedding_lookup_sparse(
+            params, sp_ids, None, combiner="sum")
+
+      fused_ops = _get_fused_embedding_lookup_reduce_ops(embedding_sum.graph)
+      self.assertLen(fused_ops, 1)
+      self.assertIn("GPU", fused_ops[0].device.upper())
+
+  @test_util.run_deprecated_v1
+  def testEmbeddingLookupSparseFusedEnvValue2DoesNotForceCpu(self):
+    if not _has_fused_embedding_lookup_reduce_flat():
+      self.skipTest("FusedEmbeddingLookupReduceFlat op wrapper not available")
+    with ops.Graph().as_default():
+      with ops.device("/GPU:0"):
+        params = constant_op.constant(
+            [[1.0], [2.0], [3.0]], dtype=dtypes.float32)
+        sp_ids = sparse_tensor.SparseTensor(
+            constant_op.constant(
+                [[0, 0], [0, 1], [1, 0], [1, 1]], dtypes.int64),
+            constant_op.constant([0, 1, 2, 0], dtypes.int32),
+            constant_op.constant([2, 2], dtypes.int64))
+
+      with _set_fused_embedding_lookup_reduce(2):
+        embedding_sum = embedding_ops.embedding_lookup_sparse(
+            params, sp_ids, None, combiner="sum")
+
+      fused_ops = _get_fused_embedding_lookup_reduce_ops(embedding_sum.graph)
+      self.assertLen(fused_ops, 1)
+      self.assertIn("GPU", fused_ops[0].device.upper())
 
   @test_util.run_deprecated_v1
   def testEmbeddingLookupSparseTrulySparseInputDoesNotUseFusedOp(self):
-    if not hasattr(gen_nn_ops, "fused_embedding_lookup_reduce"):
-      self.skipTest("FusedEmbeddingLookupReduce op wrapper not available")
+    if not _has_fused_embedding_lookup_reduce_flat():
+      self.skipTest("FusedEmbeddingLookupReduceFlat op wrapper not available")
     params = constant_op.constant([[1.0], [2.0], [3.0], [4.0]],
                                   dtype=dtypes.float32)
     sp_ids = sparse_tensor.SparseTensor(
@@ -1067,13 +1125,13 @@ class EmbeddingLookupSparseTest(test.TestCase, parameterized.TestCase):
         )
         op_types = {op.type for op in embedding_sum.graph.get_operations()}
 
-    self.assertNotIn("FusedEmbeddingLookupReduce", op_types)
+    self.assertNotIn(_FUSED_EMBEDDING_LOOKUP_REDUCE_OP_TYPE, op_types)
 
   @parameterized.parameters(["sum", "mean", "sqrtn"])
   @test_util.run_deprecated_v1
   def testGradientsEmbeddingLookupSparseFullyDense2D(self, combiner):
-    if not hasattr(gen_nn_ops, "fused_embedding_lookup_reduce"):
-      self.skipTest("FusedEmbeddingLookupReduce op wrapper not available")
+    if not _has_fused_embedding_lookup_reduce_flat():
+      self.skipTest("FusedEmbeddingLookupReduceFlat op wrapper not available")
     vocab_size = 6
     param_shape = [2]
     indices = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]]

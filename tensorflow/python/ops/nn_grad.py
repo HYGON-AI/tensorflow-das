@@ -29,13 +29,12 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 
 
-@ops.RegisterGradient("FusedEmbeddingLookupReduce")
-def _FusedEmbeddingLookupReduceGrad(op, grad):
-  """Gradient for FusedEmbeddingLookupReduce."""
+def _fused_embedding_lookup_reduce_grad(op, grad, ids, batch_size, width):
+  """Shared gradient helper for fused embedding lookup reduce ops."""
   params = op.inputs[0]
-  ids = op.inputs[1]
   grad = ops.convert_to_tensor(grad)
-  width = array_ops.shape(ids)[1]
+  batch_size = ops.convert_to_tensor(batch_size, dtype=dtypes.int32)
+  width = ops.convert_to_tensor(width, dtype=dtypes.int32)
 
   combiner = op.get_attr("combiner")
   if isinstance(combiner, bytes):
@@ -48,18 +47,38 @@ def _FusedEmbeddingLookupReduceGrad(op, grad):
     grad_scale = math_ops.rsqrt(math_ops.cast(width, grad.dtype))
 
   expanded_grad = array_ops.expand_dims(grad, axis=1)
+  ids_shape = array_ops_stack.stack([batch_size, width])
   broadcast_shape = array_ops.concat(
-      [array_ops.shape(ids), array_ops.shape(grad)[1:]], axis=0)
+      [ids_shape, array_ops.shape(grad)[1:]], axis=0)
   values = array_ops.broadcast_to(expanded_grad, broadcast_shape)
   if grad_scale is not None:
     values *= grad_scale
 
-  flat_nrows = array_ops.reshape(array_ops.shape(ids)[0] * width, [1])
+  flat_nrows = array_ops.reshape(batch_size * width, [1])
   flat_value_shape = array_ops.concat(
       [flat_nrows, array_ops.shape(grad)[1:]], axis=0)
   values = array_ops.reshape(values, flat_value_shape)
-  indices = array_ops.reshape(ids, [-1])
   dense_shape = array_ops.shape(params, out_type=ids.dtype)
+  return values, dense_shape
+
+
+@ops.RegisterGradient("FusedEmbeddingLookupReduce")
+def _FusedEmbeddingLookupReduceGrad(op, grad):
+  """Gradient for FusedEmbeddingLookupReduce."""
+  ids = op.inputs[1]
+  values, dense_shape = _fused_embedding_lookup_reduce_grad(
+      op, grad, ids, array_ops.shape(ids)[0], array_ops.shape(ids)[1])
+  indices = array_ops.reshape(ids, [-1])
+  return [indexed_slices.IndexedSlices(values, indices, dense_shape), None]
+
+
+@ops.RegisterGradient("FusedEmbeddingLookupReduceFlat")
+def _FusedEmbeddingLookupReduceFlatGrad(op, grad):
+  """Gradient for FusedEmbeddingLookupReduceFlat."""
+  ids = op.inputs[1]
+  values, dense_shape = _fused_embedding_lookup_reduce_grad(
+      op, grad, ids, op.get_attr("num_rows"), op.get_attr("num_cols"))
+  indices = ids
   return [indexed_slices.IndexedSlices(values, indices, dense_shape), None]
 
 

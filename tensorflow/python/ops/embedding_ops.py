@@ -40,13 +40,25 @@ from tensorflow.python.util.tf_export import tf_export
 _FUSED_EMBEDDING_LOOKUP_REDUCE_ENVVAR = (
     "TF_ENABLE_FUSED_EMBEDDING_LOOKUP_REDUCE"
 )
+_FUSED_EMBEDDING_LOOKUP_REDUCE_DISABLED = 0
+_FUSED_EMBEDDING_LOOKUP_REDUCE_GPU = 1
 
 
 def _is_fused_embedding_lookup_reduce_enabled():
+  return (
+      _get_fused_embedding_lookup_reduce_mode() !=
+      _FUSED_EMBEDDING_LOOKUP_REDUCE_DISABLED
+  )
+
+
+def _get_fused_embedding_lookup_reduce_mode():
   value = os.environ.get(_FUSED_EMBEDDING_LOOKUP_REDUCE_ENVVAR)
   if value is None:
-    return False
-  return value.strip().lower() not in ("", "0", "false", "no", "off")
+    return _FUSED_EMBEDDING_LOOKUP_REDUCE_DISABLED
+  value = value.strip().lower()
+  if value in ("", "0", "false", "no", "off"):
+    return _FUSED_EMBEDDING_LOOKUP_REDUCE_DISABLED
+  return _FUSED_EMBEDDING_LOOKUP_REDUCE_GPU
 
 
 def _clip(params, ids, max_norm):
@@ -110,6 +122,9 @@ def _embedding_lookup_sparse_dense_2d(params,
                                       max_norm,
                                       name):
   """Optional fused fast path for fully populated 2D SparseTensor inputs."""
+  if not _is_fused_embedding_lookup_reduce_enabled():
+    return None
+
   dense_shape_value = tensor_util.constant_value(sp_ids.dense_shape)
   if dense_shape_value is None or len(dense_shape_value) != 2:
     return None
@@ -123,18 +138,26 @@ def _embedding_lookup_sparse_dense_2d(params,
   if num_values is None or num_values != num_rows * num_cols:
     return None
 
-  if not _is_fused_embedding_lookup_reduce_enabled():
+  if not (sp_weights is None and len(params) == 1 and max_norm is None):
     return None
 
-  if not (sp_weights is None and len(params) == 1 and max_norm is None and
-          hasattr(gen_nn_ops, "fused_embedding_lookup_reduce")):
-    return None
-
-  dense_ids = array_ops.reshape(sp_ids.values, sp_ids.dense_shape)
-  dense_ids.set_shape(tensor_shape.TensorShape([num_rows, num_cols]))
   with _colocate_with(params[0]):
-    return gen_nn_ops.fused_embedding_lookup_reduce(
-        params[0], dense_ids, combiner=combiner, name=name)
+    if hasattr(gen_nn_ops, "fused_embedding_lookup_reduce_flat"):
+      return gen_nn_ops.fused_embedding_lookup_reduce_flat(
+          params[0],
+          sp_ids.values,
+          combiner=combiner,
+          num_rows=num_rows,
+          num_cols=num_cols,
+          name=name)
+
+    if hasattr(gen_nn_ops, "fused_embedding_lookup_reduce"):
+      dense_ids = array_ops.reshape(sp_ids.values, sp_ids.dense_shape)
+      dense_ids.set_shape(tensor_shape.TensorShape([num_rows, num_cols]))
+      return gen_nn_ops.fused_embedding_lookup_reduce(
+          params[0], dense_ids, combiner=combiner, name=name)
+
+  return None
 
 
 def _embedding_lookup_and_transform(params,

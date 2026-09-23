@@ -24,23 +24,37 @@ limitations under the License.
 namespace tensorflow {
 namespace {
 
-template <typename T, typename IdType>
+template <typename T, typename IdType, bool kFlatIds>
 class FusedEmbeddingLookupReduceOp : public OpKernel {
  public:
   explicit FusedEmbeddingLookupReduceOp(OpKernelConstruction* ctx)
       : OpKernel(ctx) {
     OP_REQUIRES_OK(ctx, ParseFusedEmbeddingLookupReducer(ctx, &reducer_));
+    if constexpr (kFlatIds) {
+      OP_REQUIRES_OK(ctx, ctx->GetAttr("num_rows", &num_rows_));
+      OP_REQUIRES_OK(ctx, ctx->GetAttr("num_cols", &num_cols_));
+    }
   }
 
   void Compute(OpKernelContext* ctx) override {
     const Tensor& params = ctx->input(0);
     const Tensor& ids = ctx->input(1);
-    OP_REQUIRES_OK(ctx,
-                   ValidateFusedEmbeddingLookupReduceInputs(ctx, params, ids));
+
+    int64_t batch_size = 0;
+    int64_t width = 0;
+    if constexpr (kFlatIds) {
+      OP_REQUIRES_OK(ctx, ValidateFusedEmbeddingLookupReduceFlatInputs(
+                              ctx, params, ids, num_rows_, num_cols_));
+      batch_size = num_rows_;
+      width = num_cols_;
+    } else {
+      OP_REQUIRES_OK(ctx,
+                     ValidateFusedEmbeddingLookupReduceInputs(ctx, params, ids));
+      batch_size = ids.dim_size(0);
+      width = ids.dim_size(1);
+    }
 
     const int64_t vocab_size = params.dim_size(0);
-    const int64_t batch_size = ids.dim_size(0);
-    const int64_t width = ids.dim_size(1);
     const int64_t inner_size = params.NumElements() / vocab_size;
 
     auto ids_flat = ids.flat<IdType>();
@@ -103,18 +117,22 @@ class FusedEmbeddingLookupReduceOp : public OpKernel {
 
  private:
   FusedEmbeddingLookupReducer reducer_;
+  int64_t num_rows_ = 0;
+  int64_t num_cols_ = 0;
 };
 
-#define REGISTER_CPU_KERNEL(T, IdType)                                      \
-  REGISTER_KERNEL_BUILDER(Name("FusedEmbeddingLookupReduce")               \
+#define REGISTER_CPU_KERNEL(OP_NAME, T, IdType, FlatIds)                    \
+  REGISTER_KERNEL_BUILDER(Name(OP_NAME)                                     \
                               .Device(DEVICE_CPU)                           \
                               .TypeConstraint<T>("T")                      \
                               .TypeConstraint<IdType>("Tids"),             \
-                          FusedEmbeddingLookupReduceOp<T, IdType>);
+                          FusedEmbeddingLookupReduceOp<T, IdType, FlatIds>);
 
-#define REGISTER_CPU_KERNELS_FOR_IDS(T) \
-  REGISTER_CPU_KERNEL(T, int32)         \
-  REGISTER_CPU_KERNEL(T, int64_t)
+#define REGISTER_CPU_KERNELS_FOR_IDS(T)                                     \
+  REGISTER_CPU_KERNEL("FusedEmbeddingLookupReduce", T, int32, false)       \
+  REGISTER_CPU_KERNEL("FusedEmbeddingLookupReduce", T, int64_t, false)     \
+  REGISTER_CPU_KERNEL("FusedEmbeddingLookupReduceFlat", T, int32, true)    \
+  REGISTER_CPU_KERNEL("FusedEmbeddingLookupReduceFlat", T, int64_t, true)
 
 TF_CALL_REAL_NUMBER_TYPES(REGISTER_CPU_KERNELS_FOR_IDS);
 
