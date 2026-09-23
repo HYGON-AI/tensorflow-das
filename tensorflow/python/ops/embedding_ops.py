@@ -14,24 +14,39 @@
 # ==============================================================================
 """Operations for embeddings."""
 
+import os
+
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import indexed_slices
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import sparse_tensor
 from tensorflow.python.framework import tensor_shape
+from tensorflow.python.framework import tensor_util
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import array_ops_stack
 from tensorflow.python.ops import clip_ops
 # Imports gradient definitions.
 from tensorflow.python.ops import data_flow_grad  # pylint: disable=unused-import
 from tensorflow.python.ops import data_flow_ops
+from tensorflow.python.ops import gen_nn_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import resource_variable_ops
 from tensorflow.python.ops import sparse_ops
 from tensorflow.python.ops import variables
 from tensorflow.python.util import dispatch
 from tensorflow.python.util.tf_export import tf_export
+
+_FUSED_EMBEDDING_LOOKUP_REDUCE_ENVVAR = (
+    "TF_ENABLE_FUSED_EMBEDDING_LOOKUP_REDUCE"
+)
+
+
+def _is_fused_embedding_lookup_reduce_enabled():
+  value = os.environ.get(_FUSED_EMBEDDING_LOOKUP_REDUCE_ENVVAR)
+  if value is None:
+    return False
+  return value.strip().lower() not in ("", "0", "false", "no", "off")
 
 
 def _clip(params, ids, max_norm):
@@ -85,6 +100,41 @@ def _colocate_with(param):
     return ops.colocate_with(ops.get_default_graph().capture(param.handle))
   else:
     return ops.colocate_with(param)
+
+
+def _embedding_lookup_sparse_dense_2d(params,
+                                      sp_ids,
+                                      sp_weights,
+                                      combiner,
+                                      partition_strategy,
+                                      max_norm,
+                                      name):
+  """Optional fused fast path for fully populated 2D SparseTensor inputs."""
+  dense_shape_value = tensor_util.constant_value(sp_ids.dense_shape)
+  if dense_shape_value is None or len(dense_shape_value) != 2:
+    return None
+
+  num_rows = int(dense_shape_value[0])
+  num_cols = int(dense_shape_value[1])
+  if num_rows <= 0 or num_cols <= 0:
+    return None
+
+  num_values = tensor_shape.dimension_value(sp_ids.values.get_shape()[0])
+  if num_values is None or num_values != num_rows * num_cols:
+    return None
+
+  if not _is_fused_embedding_lookup_reduce_enabled():
+    return None
+
+  if not (sp_weights is None and len(params) == 1 and max_norm is None and
+          hasattr(gen_nn_ops, "fused_embedding_lookup_reduce")):
+    return None
+
+  dense_ids = array_ops.reshape(sp_ids.values, sp_ids.dense_shape)
+  dense_ids.set_shape(tensor_shape.TensorShape([num_rows, num_cols]))
+  with _colocate_with(params[0]):
+    return gen_nn_ops.fused_embedding_lookup_reduce(
+        params[0], dense_ids, combiner=combiner, name=name)
 
 
 def _embedding_lookup_and_transform(params,
@@ -518,6 +568,17 @@ def embedding_lookup_sparse(
 
   with ops.name_scope(name, "embedding_lookup_sparse",
                       params + [sp_ids]) as name:
+    dense_result = _embedding_lookup_sparse_dense_2d(
+        params,
+        sp_ids,
+        None if ignore_weights else sp_weights,
+        combiner,
+        partition_strategy,
+        max_norm,
+        name,
+    )
+    if dense_result is not None:
+      return dense_result
 
     segment_ids = sp_ids.indices[:, 0]
     ids = sp_ids.values

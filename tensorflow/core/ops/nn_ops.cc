@@ -3806,4 +3806,27 @@ REGISTER_OP("IsotonicRegression")
       return OkStatus();
     });
 
+REGISTER_OP("FusedEmbeddingLookupReduce")
+    .Input("params: T")
+    .Input("ids: Tids")
+    .Output("output: T")
+    .Attr("T: realnumbertype")
+    .Attr("Tids: {int32, int64}")
+    .Attr("combiner: {'sum', 'mean', 'sqrtn'} = 'sum'")
+    .SetShapeFn([](InferenceContext* c) {
+      ShapeHandle params;
+      ShapeHandle ids;
+      TF_RETURN_IF_ERROR(c->WithRankAtLeast(c->input(0), 2, &params));
+      TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 2, &ids));
+
+      DimensionHandle batch_dim = c->Dim(ids, 0);
+      ShapeHandle tail_shape;
+      TF_RETURN_IF_ERROR(c->Subshape(params, 1, &tail_shape));
+      ShapeHandle output;
+      TF_RETURN_IF_ERROR(c->Concatenate(c->Vector(batch_dim), tail_shape,
+                                        &output));
+      c->set_output(0, output);
+      return OkStatus();
+    });
+
 }  // namespace tensorflow

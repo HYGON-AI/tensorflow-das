@@ -20,12 +20,47 @@ import operator
 
 from tensorflow.python.eager import backprop
 from tensorflow.python.framework import dtypes
+from tensorflow.python.framework import indexed_slices
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import array_ops_stack
 from tensorflow.python.ops import gen_nn_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
+
+
+@ops.RegisterGradient("FusedEmbeddingLookupReduce")
+def _FusedEmbeddingLookupReduceGrad(op, grad):
+  """Gradient for FusedEmbeddingLookupReduce."""
+  params = op.inputs[0]
+  ids = op.inputs[1]
+  grad = ops.convert_to_tensor(grad)
+  width = array_ops.shape(ids)[1]
+
+  combiner = op.get_attr("combiner")
+  if isinstance(combiner, bytes):
+    combiner = combiner.decode("utf-8")
+
+  grad_scale = None
+  if combiner == "mean":
+    grad_scale = math_ops.reciprocal(math_ops.cast(width, grad.dtype))
+  elif combiner == "sqrtn":
+    grad_scale = math_ops.rsqrt(math_ops.cast(width, grad.dtype))
+
+  expanded_grad = array_ops.expand_dims(grad, axis=1)
+  broadcast_shape = array_ops.concat(
+      [array_ops.shape(ids), array_ops.shape(grad)[1:]], axis=0)
+  values = array_ops.broadcast_to(expanded_grad, broadcast_shape)
+  if grad_scale is not None:
+    values *= grad_scale
+
+  flat_nrows = array_ops.reshape(array_ops.shape(ids)[0] * width, [1])
+  flat_value_shape = array_ops.concat(
+      [flat_nrows, array_ops.shape(grad)[1:]], axis=0)
+  values = array_ops.reshape(values, flat_value_shape)
+  indices = array_ops.reshape(ids, [-1])
+  dense_shape = array_ops.shape(params, out_type=ids.dtype)
+  return [indexed_slices.IndexedSlices(values, indices, dense_shape), None]
 
 
 @ops.RegisterGradient("Conv2DBackpropInput")

@@ -5343,6 +5343,26 @@ tf_kernel_library(
 )
 
 tf_kernel_library(
+    name = "fused_embedding_lookup_reduce_op",
+    srcs = [
+        "fused_embedding_lookup_reduce_op.cc",
+    ],
+    hdrs = [
+        "fused_embedding_lookup_reduce_op.h",
+    ],
+    gpu_srcs = [
+        "fused_embedding_lookup_reduce_op.h",
+        "fused_embedding_lookup_reduce_op_gpu.cu.cc",
+    ],
+    deps = [
+        "//tensorflow/core/framework:bounds_check",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
+        "//third_party/eigen3",
+    ],
+)
+
+tf_kernel_library(
     name = "variable_ops",
     prefix = "variable_ops",
     deps = STATE_DEPS,
