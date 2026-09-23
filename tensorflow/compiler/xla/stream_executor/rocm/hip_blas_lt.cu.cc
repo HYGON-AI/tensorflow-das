@@ -12,8 +12,8 @@
 #define LEGACY_HIPBLAS_DIRECT
 #include <hip/hip_runtime.h>
 #include "rocm/rocm_config.h"
-#include "rocm/include/hipblaslt/hipblaslt-ext.hpp"
-#include "rocm/include/hipblaslt/hipblaslt.h"
+#include "hipblaslt/hipblaslt-ext.hpp"
+#include "hipblaslt/hipblaslt.h"
 
 namespace stream_executor {
 namespace rocm {

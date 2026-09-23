@@ -20,8 +20,8 @@ limitations under the License.
 #include <vector>
 
 #include "rocm/rocm_config.h"
-#include "rocm/include/rocblas/rocblas.h"
-#include "rocm/include/hipblaslt/hipblaslt-ext.hpp"
+#include "rocblas/rocblas.h"
+#include "hipblaslt/hipblaslt-ext.hpp"
 #include "tensorflow/compiler/xla/primitive_util.h"
 #include "tensorflow/compiler/xla/status_macros.h"
 #include "tensorflow/compiler/xla/util.h"

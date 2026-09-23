@@ -22,9 +22,9 @@ limitations under the License.
 
 #define __HIP_DISABLE_CPP_FUNCTIONS__
 
-#include "rocm/include/hip/hip_complex.h"
-#include "rocm/include/hip/hip_runtime.h"
-#include "rocm/include/hiprand/hiprand.h"
+#include "hip/hip_complex.h"
+#include "hip/hip_runtime.h"
+#include "hiprand/hiprand.h"
 
 #else  // CUDA
 

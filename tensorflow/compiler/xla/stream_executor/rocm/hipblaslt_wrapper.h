@@ -24,11 +24,7 @@ limitations under the License.
 #include "tensorflow/tsl/platform/env.h"
 #include "tensorflow/compiler/xla/stream_executor/platform/dso_loader.h"
 
-//#if TF_ROCM_VERSION >= 50500
-#include "rocm/include/hipblaslt/hipblaslt.h"
-// #else
-// #include "rocm/include/hipblaslt.h"
-// #endif
+#include "hipblaslt/hipblaslt.h"
 
 // NOTE: dynamic loader is disabled since hipblaslt-ext is linked statically!
 #if 0

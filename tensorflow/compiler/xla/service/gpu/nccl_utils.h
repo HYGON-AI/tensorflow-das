@@ -32,9 +32,9 @@ limitations under the License.
 #if TENSORFLOW_USE_ROCM
 #include "rocm/rocm_config.h"
 #if (TF_ROCM_VERSION >= 50200)
-#include "rocm/include/rccl/rccl.h"
+#include "rccl/rccl.h"
 #else
-#include "rocm/include/rccl.h"
+#include "rccl.h"
 #endif
 #else
 #include "third_party/nccl/nccl.h"

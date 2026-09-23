@@ -79,7 +79,7 @@ struct NumericTraits<tensorflow::bfloat16>
                  /*T=*/tensorflow::bfloat16> {};
 }  // namespace cub
 #elif TENSORFLOW_USE_ROCM
-#include "rocm/include/hipcub/hipcub.hpp"
+#include "hipcub/hipcub.hpp"
 #include "rocm/rocm_config.h"
 namespace gpuprim = ::hipcub;
 

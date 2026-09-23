@@ -35,7 +35,7 @@ limitations under the License.
 #if GOOGLE_CUDA
 #include "third_party/gpus/cuda/include/cuda.h"
 #else
-#include "rocm/include/hip/hip_complex.h"
+#include "hip/hip_complex.h"
 #endif
 
 #include "tensorflow/core/platform/types.h"

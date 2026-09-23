@@ -22,9 +22,9 @@ limitations under the License.
 
 #include "rocm/rocm_config.h"
 #if (TF_ROCM_VERSION >= 50200)
-#include "rocm/include/rocsolver/rocsolver.h"
+#include "rocsolver/rocsolver.h"
 #else
-#include "rocm/include/rocsolver.h"
+#include "rocsolver.h"
 #endif
 #include "tensorflow/compiler/xla/stream_executor/platform/dso_loader.h"
 #include "tensorflow/compiler/xla/stream_executor/platform/port.h"
