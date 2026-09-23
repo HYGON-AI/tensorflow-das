@@ -187,6 +187,14 @@ class ROCMBlas : public blas::BlasSupport {
       DeviceMemorySlice<T> c_ptrs_to_wrappers, int ldc, int batch_count,
       ScratchAllocator *scratch_allocator);
 
+  tsl::Status DoBlasGemmBatchedInternalFp32Batched(
+      Stream *stream, blas::Transpose transa, blas::Transpose transb,
+      uint64_t m, uint64_t n, uint64_t k, float alpha,
+      const std::vector<float *> &a_raw_ptrs, int lda,
+      const std::vector<float *> &b_raw_ptrs, int ldb, float beta,
+      const std::vector<float *> &c_raw_ptrs, int ldc, int batch_count,
+      ScratchAllocator *scratch_allocator, Stream *orig_stream);
+
   // mutex that guards the rocBLAS handle for this device.
   absl::Mutex mu_;
 
@@ -200,6 +208,7 @@ class ROCMBlas : public blas::BlasSupport {
 
   SE_DISALLOW_COPY_AND_ASSIGN(ROCMBlas);
 };
+
 
 }  // namespace gpu
 }  // namespace stream_executor

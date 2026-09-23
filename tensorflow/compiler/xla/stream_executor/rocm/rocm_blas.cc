@@ -743,6 +743,67 @@ tsl::Status ROCMBlas::AllocateStridedBuffer(
   return tsl::OkStatus();
 }
 
+// 新增：fp32 专用 batched 实现，使用指针数组接口，避免 broadcast
+// 对应 NV 的 cublasGemmBatchedEx 路径
+tsl::Status ROCMBlas::DoBlasGemmBatchedInternalFp32Batched(
+    Stream *stream, blas::Transpose transa, blas::Transpose transb,
+    uint64_t m, uint64_t n, uint64_t k, float alpha,
+    const std::vector<float *> &a_raw_ptrs, int lda,
+    const std::vector<float *> &b_raw_ptrs, int ldb, float beta,
+    const std::vector<float *> &c_raw_ptrs, int ldc, int batch_count,
+    ScratchAllocator *scratch_allocator, Stream *orig_stream) {
+
+  const size_t ptr_array_size = batch_count * sizeof(float *);
+
+  DeviceMemory<float *> a_dev, b_dev, c_dev;
+  std::unique_ptr<TemporaryDeviceMemory<float *>> a_tmp, b_tmp, c_tmp;
+
+  if (scratch_allocator != nullptr) {
+    TF_ASSIGN_OR_RETURN(DeviceMemory<uint8_t> a_bytes,
+                        scratch_allocator->AllocateBytes(ptr_array_size));
+    TF_ASSIGN_OR_RETURN(DeviceMemory<uint8_t> b_bytes,
+                        scratch_allocator->AllocateBytes(ptr_array_size));
+    TF_ASSIGN_OR_RETURN(DeviceMemory<uint8_t> c_bytes,
+                        scratch_allocator->AllocateBytes(ptr_array_size));
+    a_dev = DeviceMemory<float *>(a_bytes);
+    b_dev = DeviceMemory<float *>(b_bytes);
+    c_dev = DeviceMemory<float *>(c_bytes);
+  } else {
+    TF_ASSIGN_OR_RETURN(a_tmp, stream->AllocateTemporaryArray<float *>(batch_count));
+    TF_ASSIGN_OR_RETURN(b_tmp, stream->AllocateTemporaryArray<float *>(batch_count));
+    TF_ASSIGN_OR_RETURN(c_tmp, stream->AllocateTemporaryArray<float *>(batch_count));
+    a_dev = DeviceMemory<float *>(*a_tmp->mutable_device_memory());
+    b_dev = DeviceMemory<float *>(*b_tmp->mutable_device_memory());
+    c_dev = DeviceMemory<float *>(*c_tmp->mutable_device_memory());
+  }
+
+  if (!stream->ThenMemcpy(&a_dev, a_raw_ptrs.data(), ptr_array_size).ok() ||
+      !stream->ThenMemcpy(&b_dev, b_raw_ptrs.data(), ptr_array_size).ok() ||
+      !stream->ThenMemcpy(&c_dev, c_raw_ptrs.data(), ptr_array_size).ok()) {
+    return tsl::Status(absl::StatusCode::kInternal,
+                       "failed to copy pointer arrays to device in "
+                       "ROCMBlas::DoBlasGemmBatchedInternalFp32Batched");
+  }
+
+  // 调用 rocblas_sgemm_batched，GPU自己寻址，不要求内存连续
+  bool ok = DoBlasInternal(
+      wrap::rocblas_sgemm_batched, stream, /* pointer_mode_host = */ true,
+      ROCMBlasTranspose(transa), ROCMBlasTranspose(transb),
+      (rocblas_int)m, (rocblas_int)n, (rocblas_int)k,
+      &alpha,
+      const_cast<const float **>(GpuMemory(a_dev)), lda,
+      const_cast<const float **>(GpuMemory(b_dev)), ldb,
+      &beta,
+      GpuMemory(c_dev), ldc,
+      (rocblas_int)batch_count);
+
+  if (!ok) {
+    return tsl::Status(absl::StatusCode::kInternal,
+                       "rocblas_sgemm_batched failed, see log for details");
+  }
+  return tsl::OkStatus();
+}
+
 
 template <typename T, typename FuncT>
 tsl::Status ROCMBlas::DoBlasGemmBatchedInternal(
@@ -789,6 +850,35 @@ tsl::Status ROCMBlas::DoBlasGemmBatchedInternal(
         reinterpret_cast<MAPPED_T *>(b_ptrs_to_wrappers[i]->opaque()));
     c_raw_ptrs.push_back(
         reinterpret_cast<MAPPED_T *>(c_ptrs_to_wrappers[i]->opaque()));
+  }
+
+  // fp32 快速路径：检测到stride没对齐直接用 rocblas_sgemm_batched
+  // 跳过 broadcast/gather，完全对应 NV 的 cublasGemmBatchedEx 实现
+  if constexpr (std::is_same_v<T, float>) {
+    static const bool use_sgemm_batched = []() {
+      const char* env = std::getenv("ROCM_USE_SGEMM_BATCHED");
+      if (env == nullptr) return false;
+      std::string val(env);
+      return (val == "1" || val == "true");
+    }();
+
+    if (use_sgemm_batched) {
+      bool needs_batched_api = false;
+      for (int i = 1; i < batch_count; ++i) {
+        if ((uint64_t)(a_raw_ptrs[i] - a_raw_ptrs[i-1]) != batch_stride_a ||
+            (uint64_t)(b_raw_ptrs[i] - b_raw_ptrs[i-1]) != batch_stride_b ||
+            (uint64_t)(c_raw_ptrs[i] - c_raw_ptrs[i-1]) != batch_stride_c) {
+          needs_batched_api = true;
+          break;
+        }
+      }
+      if (needs_batched_api) {
+        return DoBlasGemmBatchedInternalFp32Batched(
+            stream, transa, transb, m, n, k, alpha,
+            a_raw_ptrs, lda, b_raw_ptrs, ldb, beta,
+            c_raw_ptrs, ldc, batch_count, scratch_allocator, stream);
+      }
+    }
   }
 
   DeviceMemory<MAPPED_T> a;
