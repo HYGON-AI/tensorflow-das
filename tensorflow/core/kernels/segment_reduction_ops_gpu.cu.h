@@ -216,6 +216,10 @@ __global__ void UnsortedSegmentCustomKernel(
     const int64_t input_segment_index = input_index / inner_dim_size;
     const int64_t segment_offset = input_index % inner_dim_size;
     const Index output_segment_index = segment_ids[input_segment_index];
+    if (output_segment_index < 0 ||
+        output_segment_index >= output_outer_dim_size) {
+      continue;
+    }
 
     const T input_value = ldg(input + input_index);
     if (SkipZero && input_value == static_cast<T>(0)) {
@@ -237,6 +241,10 @@ __global__ void UnsortedSegmentCustomKernel_fp16(
     const int64_t input_segment_index = input_index / inner_dim_size;
     const int64_t segment_offset = input_index % inner_dim_size;
     const Index output_segment_index = segment_ids[input_segment_index];
+    if (output_segment_index < 0 ||
+        output_segment_index >= output_outer_dim_size) {
+      continue;
+    }
 
     const T input_value = ldg(input + input_index);
     if (SkipZero && input_value == static_cast<T>(0)) {
@@ -275,6 +283,10 @@ __global__ void __launch_bounds__(1024) UnsortedSegmentRegisterOptKernel(
         const int64_t input_segment_index = input_index / inner_dim_size;
         const int64_t segment_offset = input_index % inner_dim_size;
         const Index output_segment_index = segment_ids[input_segment_index];
+        if (output_segment_index < 0 ||
+            output_segment_index >= output_outer_dim_size) {
+          continue;
+        }
 
         const T input_value = input[input_index];
         if (SkipZero && input_value == static_cast<T>(0)) {
