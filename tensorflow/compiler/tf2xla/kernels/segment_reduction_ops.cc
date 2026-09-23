@@ -146,9 +146,9 @@ class SegmentSum : public SegmentReduce {
 
 REGISTER_XLA_OP(Name("SegmentSumV2").CompileTimeConstantInput("num_segments"),
                 SegmentSum</*indices_are_sorted=*/true>);
-REGISTER_XLA_OP(
-    Name("UnsortedSegmentSum").CompileTimeConstantInput("num_segments"),
-    SegmentSum</*indices_are_sorted=*/false>);
+// REGISTER_XLA_OP(
+//     Name("UnsortedSegmentSum").CompileTimeConstantInput("num_segments"),
+//     SegmentSum</*indices_are_sorted=*/false>);
 
 template <bool indices_are_sorted>
 class SegmentProd : public SegmentReduce {
