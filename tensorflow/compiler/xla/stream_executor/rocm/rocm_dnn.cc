@@ -323,6 +323,14 @@ namespace wrap {
   __macro(miopenSetActivationDescriptor)                             \
   __macro(miopenGetActivationDescriptor)                             \
   __macro(miopenDestroyActivationDescriptor)                         \
+  __macro(miopenSetRNNPaddingMode)                                   \
+  __macro(miopenRNNForward)                                          \
+  __macro(miopenGetRNNTempSpaceSizes)                                \
+  __macro(miopenDestroySeqTensorDescriptor)                          \
+  __macro(miopenSetRNNDataSeqTensorDescriptor)                       \
+  __macro(miopenCreateSeqTensorDescriptor)                           \
+  __macro(miopenRNNBackwardSeqData)                                  \
+  __macro(miopenRNNBackwardWeightsSeqTensor)                         \
   __macro(miopenCreateFusionPlan)                                    \
   __macro(miopenCreateOpConvForward)                                 \
   __macro(miopenCreateOpBiasForward)                                 \
@@ -461,6 +469,14 @@ namespace wrap {
   __macro(miopenConvolutionForwardGetSolution)                       \
   __macro(miopenConvolutionForwardGetSolutionWorkspaceSize)          \
   __macro(miopenConvolutionForwardCompileSolution)                   \
+  __macro(miopenSetRNNDataSeqTensorDescriptor)                       \
+  __macro(miopenCreateSeqTensorDescriptor)                           \
+  __macro(miopenDestroySeqTensorDescriptor)                          \
+  __macro(miopenGetRNNTempSpaceSizes)                                \
+  __macro(miopenRNNForward)                                          \
+  __macro(miopenSetRNNPaddingMode)                                   \
+  __macro(miopenRNNBackwardSeqData)                                  \
+  __macro(miopenRNNBackwardWeightsSeqTensor)                         \
   __macro(miopenConvolutionForwardImmediate)                         \
   __macro(miopenConvolutionBackwardDataGetSolutionCount)             \
   __macro(miopenConvolutionBackwardDataGetSolution)                  \
@@ -1945,7 +1961,7 @@ class MIOpenRnnDescriptor : public MIOpenDescriptorCommon<dnn::RnnDescriptor> {
                       miopenRNNMode_t rnn_mode, miopenDataType_t data_type,
                       float dropout, uint64_t seed,
                       const dnn::AlgorithmConfig& algorithm_config,
-                      ScratchAllocator* state_allocator)
+                      ScratchAllocator* state_allocator, bool use_padded_io)
       : rnn_desc_(nullptr),
         num_layers_(num_layers),
         hidden_size_(hidden_size),
@@ -1965,6 +1981,13 @@ class MIOpenRnnDescriptor : public MIOpenDescriptorCommon<dnn::RnnDescriptor> {
         miopenRNNwithBias /*biasMode*/, miopenRNNdefault /*algo*/,
         data_type /*dataType*/);
     RETURN_IF_MIOPEN_ERROR(status, "Unable to update RNN descriptor");
+
+    miopenRNNPaddingMode_t padding_mode_to_set =
+    use_padded_io ? miopenRNNIOWithPadding : miopenRNNIONotPadded;
+
+    status = wrap::miopenSetRNNPaddingMode(rnn_desc_, padding_mode_to_set);
+    RETURN_IF_MIOPEN_ERROR(status, "Unable to update RNN descriptor");
+
     // Create the params handle.
     miopen_params_desc_.reset(
         new MIOpenRnnParamsDescriptor(miopen_handle, *this));
@@ -2043,59 +2066,148 @@ int MIOpenRnnParamsDescriptor::GetRegionCountPerLayer() const {
   }
 }
 
+using MIOpenTensorDescriptor =
+    std::unique_ptr<miopenTensorDescriptor,
+                    std::function<void(miopenTensorDescriptor_t)>>;
+using MIOpenSeqTensorDescriptor =
+    std::unique_ptr<miopenSeqTensorDescriptor,
+                    std::function<void(miopenSeqTensorDescriptor_t)>>;
+
 class MIOpenRnnSequenceTensorDescriptor
-    : public MIOpenDescriptorCommon<dnn::RnnSequenceTensorDescriptor> {
- public:
-  MIOpenRnnSequenceTensorDescriptor(int seq_length, int batch_size,
-                                    int data_size, miopenDataType_t data_type)
-      : seq_length_(seq_length),
+        : public dnn::RnnSequenceTensorDescriptor {
+ private:
+  MIOpenRnnSequenceTensorDescriptor(int max_seq_length, int batch_size,
+                                    int data_size,
+                                    MIOpenSeqTensorDescriptor seq_tensor_desc,
+                                    MIOpenTensorDescriptor handle)
+      : max_seq_length_(max_seq_length),
         batch_size_(batch_size),
         data_size_(data_size),
-        data_type_(data_type) {
-    miopenTensorDescriptor_t handle = nullptr;
-    if (seq_length <= 0) {
-      string error_msg =
-          absl::StrCat("sequence length must be positive: ", seq_length);
-      LOG(ERROR) << error_msg;
-      SetFailure(tsl::Status(absl::StatusCode::kUnknown, error_msg));
-      return;
+        handle_(std::move(handle)),
+        seq_tensor_desc_(std::move(seq_tensor_desc)),
+        handles_(max_seq_length, handle_.get()) {}
+
+ public:
+  static tsl::StatusOr<MIOpenRnnSequenceTensorDescriptor> Create(
+    int max_seq_length, int batch_size, int data_size,
+    miopenDataType_t data_type) {
+  const char* env_val = std::getenv("Enable_Fixed_To_VarLength_SeqDesc");
+  bool enable_fake_seq = (env_val != nullptr && std::string(env_val) == "1");
+
+  MIOpenTensorDescriptor handle(nullptr, wrap::miopenDestroyTensorDescriptor);
+  miopenTensorDescriptor_t raw_handle = nullptr;
+
+  miopenStatus_t status = wrap::miopenCreateTensorDescriptor(&raw_handle);
+  if (status != miopenStatusSuccess) {
+    return absl::InternalError("Failed to create tensor descriptor");
+  }
+
+  handle.reset(raw_handle);
+  std::array<int, 2> dims = {{batch_size, data_size}};
+  status = wrap::miopenSetTensorDescriptor(handle.get(), data_type, 2,
+                                           dims.data(), nullptr);
+  if (status != miopenStatusSuccess) {
+    return absl::InternalError("Failed to set tensor descriptor");
+  }
+
+  if (!enable_fake_seq) {
+    return MIOpenRnnSequenceTensorDescriptor(
+        max_seq_length, batch_size, data_size, nullptr, std::move(handle));
+  }
+
+  std::vector<int> seq_lengths(batch_size, max_seq_length);
+
+  MIOpenSeqTensorDescriptor seq_desc(nullptr,
+                                     wrap::miopenDestroySeqTensorDescriptor);
+  miopenSeqTensorDescriptor_t raw_seq_desc = nullptr;
+  status = wrap::miopenCreateSeqTensorDescriptor(&raw_seq_desc);
+  if (status != miopenStatusSuccess) {
+    return absl::InternalError("Failed to create sequence tensor descriptor");
+  }
+  seq_desc.reset(raw_seq_desc);
+
+
+  miopenRNNBaseLayout_t layout = miopenRNNDataSeqMajorPadded;
+
+
+  status = wrap::miopenSetRNNDataSeqTensorDescriptor(
+      seq_desc.get(), data_type, layout, max_seq_length, batch_size,
+      data_size, seq_lengths.data(), nullptr);
+  if (status != miopenStatusSuccess) {
+    return absl::InternalError("Failed to set sequence tensor descriptor");
+  }
+
+  return MIOpenRnnSequenceTensorDescriptor(
+      max_seq_length, batch_size, data_size, std::move(seq_desc),
+      std::move(handle));
+  }
+
+  static tsl::StatusOr<MIOpenRnnSequenceTensorDescriptor> Create(
+      int max_seq_length, int batch_size, int data_size,
+      miopenDataType_t data_type, bool time_major,
+      const absl::Span<const int>& seq_lengths) {
+    MIOpenTensorDescriptor handle(nullptr, wrap::miopenDestroyTensorDescriptor);
+    miopenTensorDescriptor_t raw_handle = nullptr;
+
+    miopenStatus_t status = wrap::miopenCreateTensorDescriptor(&raw_handle);
+    if (status != miopenStatusSuccess) {
+      return absl::InternalError("Failed to create tensor descriptor");
     }
-    auto status = wrap::miopenCreateTensorDescriptor(&handle);
-    RETURN_IF_MIOPEN_ERROR(status, "Failed to create tensor descriptor");
+
+    handle.reset(raw_handle);
+
     std::array<int, 2> dims = {{batch_size, data_size}};
-    status = wrap::miopenSetTensorDescriptor(
-        handle /*tensorDesc*/, data_type /*dataType*/, 2 /*nbDims*/,
-        dims.data() /*dimA*/, nullptr /*strideA*/);
-    RETURN_IF_MIOPEN_ERROR(status, "Failed to update tensor descriptor");
-    // Replicate handle across the number of steps.
-    handles_.assign(seq_length, handle);
+    status = wrap::miopenSetTensorDescriptor(handle.get(), data_type, 2,
+                                             dims.data(), nullptr);
+    if (status != miopenStatusSuccess) {
+      return absl::InternalError("Failed to set tensor descriptor");
+    }
+
+    MIOpenSeqTensorDescriptor seq_desc(nullptr,
+                                       wrap::miopenDestroySeqTensorDescriptor);
+
+    miopenSeqTensorDescriptor_t raw_seq_desc = nullptr;
+    status = wrap::miopenCreateSeqTensorDescriptor(&raw_seq_desc);
+    if (status != miopenStatusSuccess) {
+      return absl::InternalError("Failed to create sequence tensor descriptor");
+    }
+
+    seq_desc.reset(raw_seq_desc);
+
+    miopenRNNBaseLayout_t layout = time_major ? miopenRNNDataSeqMajorPadded
+                                              : miopenRNNDataBatchMajorPadded;
+
+    status = wrap::miopenSetRNNDataSeqTensorDescriptor(
+        seq_desc.get(), data_type, layout, max_seq_length, batch_size,
+        data_size, seq_lengths.data(), nullptr);
+    if (status != miopenStatusSuccess) {
+      return absl::InternalError("Failed to set sequence tensor descriptor");
+    }
+
+    return MIOpenRnnSequenceTensorDescriptor(max_seq_length, batch_size,
+                                             data_size, std::move(seq_desc),
+                                             std::move(handle));
   }
 
-  ~MIOpenRnnSequenceTensorDescriptor() override {
-    // Only the first one needs to be destroyed. All others are the same.
-    auto status = wrap::miopenDestroyTensorDescriptor(handles_[0]);
-    RETURN_IF_MIOPEN_ERROR(status,
-                           "Failed to destroy sequence tensor descriptor");
+  const miopenTensorDescriptor_t* handles() const { return handles_.data(); }
+  miopenSeqTensorDescriptor_t seq_tensor_descriptor() const {
+    return seq_tensor_desc_.get();
   }
 
-  const miopenTensorDescriptor_t* handles() const {
-    if (!ok()) return nullptr;
-    CHECK(!handles_.empty()) << "handles cannot be empty";
-    return handles_.data();
-  }
 
-  int seq_length() const { return seq_length_; }
+
+  bool is_var_seq_lengths() const { return seq_tensor_desc_ != nullptr; }
   int batch_size() const { return batch_size_; }
+  int seq_length() const { return max_seq_length_; }
   int data_size() const { return data_size_; }
 
  private:
-  int seq_length_;
+  int max_seq_length_;
   int batch_size_;
   int data_size_;
-  miopenDataType_t data_type_;
+  MIOpenTensorDescriptor handle_;
+  MIOpenSeqTensorDescriptor seq_tensor_desc_;
   std::vector<miopenTensorDescriptor_t> handles_;
-  tsl::Status status_;
-  SE_DISALLOW_COPY_AND_ASSIGN(MIOpenRnnSequenceTensorDescriptor);
 };
 
 class MIOpenRnnStateTensorDescriptor
@@ -2230,6 +2342,22 @@ bool CheckRNNParameterSize(
          rnn_desc.ParamsSizeInBytes();
 }
 
+bool CreateRnnWorkspace(Stream* stream, size_t workspace_size_in_bytes,
+                        ScratchAllocator* workspace_allocator,
+                        DeviceMemory<uint8>* workspace) {
+  if (workspace_size_in_bytes > 0) {
+    auto allocated =
+        workspace_allocator->AllocateBytes(workspace_size_in_bytes);
+    if (!allocated.ok() || (*workspace = allocated.value()) == nullptr) {
+      LOG(ERROR) << "Failed to allocate RNN workspace";
+      return false;
+    }
+  } else {
+    *workspace = DeviceMemory<uint8>();
+  }
+  return true;
+}
+
 bool CreateRnnWorkspace(Stream* stream, miopenHandle_t miopen_handle,
                         const MIOpenRnnDescriptor& rnn_desc,
                         const MIOpenRnnSequenceTensorDescriptor& input_desc,
@@ -2245,20 +2373,9 @@ bool CreateRnnWorkspace(Stream* stream, miopenHandle_t miopen_handle,
     LOG(ERROR) << "Unable to query workspace size: " << ToString(status);
     return false;
   }
-  // Allocate the workspace.
-  if (workspace_size_in_bytes > 0) {
-    auto allocated =
-        workspace_allocator->AllocateBytes(workspace_size_in_bytes);
-    if (!allocated.ok() || (*workspace = allocated.value()) == nullptr) {
-      LOG(ERROR) << "Failed to allocate RNN workspace";
 
-      return false;
-    }
-    stream->ThenMemZero(workspace, workspace_size_in_bytes);
-  } else {
-    *workspace = DeviceMemory<uint8>();
-  }
-  return true;
+  return CreateRnnWorkspace(stream, workspace_size_in_bytes,
+                            workspace_allocator, workspace);
 }
 
 }  // namespace
@@ -2281,7 +2398,7 @@ bool MIOpenSupport::DoRnnForwardImpl(
     ScratchAllocator* reserve_space_allocator,
     ScratchAllocator* workspace_allocator,
     dnn::ProfileResult* output_profile_result) {
-  // extract model parameters
+
   RnnModelDims model_dims;
   bool res = ExtractAndCheckRnnForward(
       rnn_desc, input_desc, input_data, input_h_desc, input_h_data,
@@ -2294,98 +2411,139 @@ bool MIOpenSupport::DoRnnForwardImpl(
   }
 
   auto miopen = miopen_->GetHandle(parent_, stream);
-
-  // check params size
-
   if (!CheckRNNParameterSize(miopen.handle(), rnn_desc, input_desc)) {
     LOG(ERROR) << "Invalid parameters";
     return false;
   }
 
-  // create the workspace
-  DeviceMemory<uint8> workspace;
-  if (!CreateRnnWorkspace(stream, miopen.handle(), rnn_desc, input_desc,
-                          workspace_allocator, &workspace)) {
-    LOG(ERROR) << "Unable to create rnn workspace";
+  size_t workspace_size_in_bytes = 0;
+  size_t reserve_space_size_in_bytes = 0;
+  size_t weight_space_size = 0;
 
+  DeviceMemory<uint8> workspace;
+  DeviceMemory<uint8> reserve_space;
+
+  if (input_desc.is_var_seq_lengths()) {
+    miopenStatus_t status = wrap::miopenGetRNNTempSpaceSizes(
+        /*handle=*/miopen.handle(),
+        /*rnnDesc=*/rnn_desc.handle(),
+        /*xDesc=*/input_desc.seq_tensor_descriptor(),
+        /*fMode=*/is_training ? miopenRNNTraining : miopenRNNInference,
+        /*workSpaceSize=*/&workspace_size_in_bytes,
+        /*reserveSpaceSize=*/&reserve_space_size_in_bytes);
+
+    if (status != miopenStatusSuccess) {
+      LOG(ERROR) << "Failed to get RNN temp space sizes: " << ToString(status);
+      return false;
+    }
+  }
+
+  if (workspace_size_in_bytes > 0) {
+    auto allocated = workspace_allocator->AllocateBytes(workspace_size_in_bytes);
+    if (!allocated.ok()) {
+      LOG(ERROR) << "Fail to allocate RNN workspace: " << allocated.status();
+      return false;
+    }
+    workspace = allocated.value();
+  }
+
+  if (is_training) {
+    if (!input_desc.is_var_seq_lengths()) {
+      miopenStatus_t status = wrap::miopenGetRNNTrainingReserveSize(
+          miopen.handle(), rnn_desc.handle(), model_dims.seq_length,
+          input_desc.handles(), &reserve_space_size_in_bytes);
+      if (status != miopenStatusSuccess) {
+        LOG(ERROR) << "Unable to query reserve space size: " << ToString(status);
+        return false;
+      }
+    }
+    if (reserve_space_size_in_bytes > 0) {
+      auto allocated = reserve_space_allocator->AllocateBytes(reserve_space_size_in_bytes);
+      if (!allocated.ok()) {
+        LOG(ERROR) << "Fail to allocate RNN reserve space: " << allocated.status();
+        return false;
+      }
+      reserve_space = allocated.value();
+    }
+  }
+
+  if (input_desc.is_var_seq_lengths()) {
+    miopenStatus_t status = wrap::miopenGetRNNParamsSize(
+        miopen.handle(), rnn_desc.handle(), input_desc.handles()[0],
+        &weight_space_size, rnn_desc.data_type());
+    if (status != miopenStatusSuccess) {
+      LOG(ERROR) << "Unable to determine required RNN weights buffer size: "
+                 << ToString(status);
+      return false;
+    }
+  }
+
+  bool success = false;
+  if (input_desc.is_var_seq_lengths()) {
+    success = CreateRnnWorkspace(stream, workspace_size_in_bytes, workspace_allocator, &workspace);
+  } else {
+    success = CreateRnnWorkspace(stream, miopen.handle(), rnn_desc, input_desc, workspace_allocator, &workspace);
+  }
+  if (!success) {
+    LOG(ERROR) << "Unable to create rnn workspace";
     return false;
   }
 
-  // query the reserve space size
-  // allocate the reserve space
-  DeviceMemory<uint8> reserve_space;
-  if (is_training) {
-    size_t reserve_space_size_in_bytes = 0;
-    auto status = wrap::miopenGetRNNTrainingReserveSize(
-        miopen.handle() /*handle*/, rnn_desc.handle() /*rnnDesc*/,
-        model_dims.seq_length /*seqLength*/, input_desc.handles() /*xDesc*/,
-        &reserve_space_size_in_bytes /*sizeInBytes*/);
-    if (status != miopenStatusSuccess) {
-      LOG(ERROR) << "Unable to query reserve space size: " << ToString(status);
-      return false;
-    }
-
-    if (reserve_space_size_in_bytes > 0) {
-      auto allocated =
-          reserve_space_allocator->AllocateBytes(reserve_space_size_in_bytes);
-      if (!allocated.ok() ||
-          (reserve_space = allocated.value()) == nullptr) {
-        LOG(ERROR) << "Fail to allocate RNN reserve space";
-        return false;
-      }
-      stream->ThenMemZero(&reserve_space, reserve_space_size_in_bytes);
-    }
-  }
-
   std::unique_ptr<GpuTimer, GpuTimerDeleter> timer;
-  const bool is_profiling = output_profile_result != nullptr;
+  const bool is_profiling = (output_profile_result != nullptr);
   if (is_profiling) {
     timer.reset(new GpuTimer(parent_));
-    // The start and stop of the timer should be as close to the Cudnn call as
-    // possible. It is still possible for other threads to issue workload on
-    // to this stream. So it could take multiple profiling measurements.
     if (!timer->Init() || !timer->Start(AsGpuStream(stream))) {
       LOG(ERROR) << "Failed to start timer";
       return false;
     }
   }
 
-  // make the forward call
+  miopenStatus_t status = miopenStatusSuccess;
   if (!is_training) {
-    auto status = wrap::miopenRNNForwardInference(
-        miopen.handle() /*handle*/, rnn_desc.handle() /*rnnDesc*/,
-        model_dims.seq_length /*seqLength*/, input_desc.handles() /*xDesc*/,
-        input_data.opaque() /*x*/, input_h_desc.handle() /*hxDesc*/,
-        input_h_data.opaque() /*hx*/, input_c_desc.handle() /*cxDesc*/,
-        input_c_data.opaque() /*cx*/, rnn_desc.params_handle() /*wDesc*/,
-        params.opaque() /*w*/, output_desc.handles() /*yDesc*/,
-        output_data->opaque() /*y*/, output_h_desc.handle() /*hyDesc*/,
-        output_h_data->opaque() /*hy*/, output_c_desc.handle() /*cyDesc*/,
-        output_c_data->opaque() /*cy*/, workspace.opaque() /*workspace*/,
-        workspace.size() /*workSpaceSizeInBytes*/);
-
+    if (input_desc.is_var_seq_lengths()) {
+      status = wrap::miopenRNNForward(
+          miopen.handle(), rnn_desc.handle(), miopenRNNInference,
+          input_desc.seq_tensor_descriptor(), input_data.opaque(),
+          input_h_desc.handle(), input_h_data.opaque(), output_h_data->opaque(),
+          input_c_desc.handle(), input_c_data.opaque(), output_c_data->opaque(),
+          output_desc.seq_tensor_descriptor(), output_data->opaque(),
+          params.opaque(), weight_space_size, workspace.opaque(), workspace.size(),
+          reserve_space.opaque(), reserve_space.size());
+    } else {
+      status = wrap::miopenRNNForwardInference(
+          miopen.handle(), rnn_desc.handle(), model_dims.seq_length,
+          input_desc.handles(), input_data.opaque(), input_h_desc.handle(),
+          input_h_data.opaque(), input_c_desc.handle(), input_c_data.opaque(),
+          rnn_desc.params_handle(), params.opaque(), output_desc.handles(),
+          output_data->opaque(), output_h_desc.handle(), output_h_data->opaque(),
+          output_c_desc.handle(), output_c_data->opaque(), workspace.opaque(), workspace.size());
+    }
     if (status != miopenStatusSuccess) {
-      LOG(ERROR) << "Failed to call miopenRNNForwardInference: "
-                 << ToString(status);
+      LOG(ERROR) << "Failed to call miopenRNNForwardInference: " << ToString(status);
       return false;
     }
   } else {
-    auto status = wrap::miopenRNNForwardTraining(
-        miopen.handle() /*handle*/, rnn_desc.handle() /*rnnDesc*/,
-        model_dims.seq_length /*seqLength*/, input_desc.handles() /*xDesc*/,
-        input_data.opaque() /*x*/, input_h_desc.handle() /*hxDesc*/,
-        input_h_data.opaque() /*hx*/, input_c_desc.handle() /*cxDesc*/,
-        input_c_data.opaque() /*cx*/, rnn_desc.params_handle() /*wDesc*/,
-        params.opaque() /*w*/, output_desc.handles() /*yDesc*/,
-        output_data->opaque() /*y*/, output_h_desc.handle() /*hyDesc*/,
-        output_h_data->opaque() /*hy*/, output_c_desc.handle() /*cyDesc*/,
-        output_c_data->opaque() /*cy*/, workspace.opaque() /*workspace*/,
-        workspace.size() /*workSpaceSizeInBytes*/,
-        reserve_space.opaque() /*reserveSpace*/,
-        reserve_space.size() /*reserveSpaceSizeInBytes*/);
+    if (input_desc.is_var_seq_lengths()) {
+      status = wrap::miopenRNNForward(
+          miopen.handle(), rnn_desc.handle(), miopenRNNTraining,
+          input_desc.seq_tensor_descriptor(), input_data.opaque(),
+          input_h_desc.handle(), input_h_data.opaque(), output_h_data->opaque(),
+          input_c_desc.handle(), input_c_data.opaque(), output_c_data->opaque(),
+          output_desc.seq_tensor_descriptor(), output_data->opaque(), params.opaque(),
+          weight_space_size, workspace.opaque(), workspace.size(), reserve_space.opaque(), reserve_space.size());
+    } else {
+      status = wrap::miopenRNNForwardTraining(
+          miopen.handle(), rnn_desc.handle(), model_dims.seq_length, input_desc.handles(),
+          input_data.opaque(), input_h_desc.handle(), input_h_data.opaque(),
+          input_c_desc.handle(), input_c_data.opaque(), rnn_desc.params_handle(),
+          params.opaque(), output_desc.handles(), output_data->opaque(),
+          output_h_desc.handle(), output_h_data->opaque(), output_c_desc.handle(),
+          output_c_data->opaque(), workspace.opaque(), workspace.size(),
+          reserve_space.opaque(), reserve_space.size());
+    }
     if (status != miopenStatusSuccess) {
-      LOG(ERROR) << "Failed to call miopenRNNForwardTraining"
-                 << ToString(status);
+      LOG(ERROR) << "Failed to call miopenRNNForwardTraining: " << ToString(status);
       return false;
     }
   }
@@ -2397,8 +2555,7 @@ bool MIOpenSupport::DoRnnForwardImpl(
     }
     auto algo_desc = *rnn_desc.algorithm_config().algorithm();
     output_profile_result->set_algorithm(algo_desc);
-    output_profile_result->set_elapsed_time_in_ms(
-        timer->GetElapsedMilliseconds());
+    output_profile_result->set_elapsed_time_in_ms(timer->GetElapsedMilliseconds());
   }
 
   return true;
@@ -2429,7 +2586,7 @@ bool MIOpenSupport::DoRnnBackwardImpl(
     DeviceMemory<uint8>* reserve_space_data,
     ScratchAllocator* workspace_allocator,
     dnn::ProfileResult* output_profile_result) {
-  // extract model parameters
+
   RnnModelDims model_dims;
   bool res = ExtractAndCheckRnnForward(
       rnn_desc, input_desc, input_data, input_h_desc, input_h_data,
@@ -2441,95 +2598,155 @@ bool MIOpenSupport::DoRnnBackwardImpl(
   }
 
   auto miopen = miopen_->GetHandle(parent_, stream);
-
-  // check params size
-
   if (!CheckRNNParameterSize(miopen.handle(), rnn_desc, input_desc)) {
     LOG(ERROR) << "Invalid parameters";
     return false;
   }
 
-  // create the workspace
+  size_t workspace_size_in_bytes = 0;
+  size_t weight_space_size = 0;
   DeviceMemory<uint8> workspace;
-  if (!CreateRnnWorkspace(stream, miopen.handle(), rnn_desc, input_desc,
-                          workspace_allocator, &workspace)) {
+
+  if (input_desc.is_var_seq_lengths()) {
+    size_t reserve_space_size_in_bytes = 0;
+    miopenStatus_t status = wrap::miopenGetRNNTempSpaceSizes(
+        /*handle=*/miopen.handle(),
+        /*rnnDesc=*/rnn_desc.handle(),
+        /*xDesc=*/input_desc.seq_tensor_descriptor(),
+        /*fMode=*/miopenRNNTraining,
+        /*workSpaceSize=*/&workspace_size_in_bytes,
+        /*reserveSpaceSize=*/&reserve_space_size_in_bytes);
+
+    if (status != miopenStatusSuccess) {
+      LOG(ERROR) << "Failed to get RNN temp space sizes: " << ToString(status);
+      return false;
+    }
+
+    status = wrap::miopenGetRNNParamsSize(
+        miopen.handle(), rnn_desc.handle(), input_desc.handles()[0],
+        &weight_space_size, rnn_desc.data_type());
+    if (status != miopenStatusSuccess) {
+      LOG(ERROR) << "Unable to determine required RNN weights buffer size: "
+                 << ToString(status);
+      return false;
+    }
+  }
+
+  bool success = false;
+  if (input_desc.is_var_seq_lengths()) {
+    success = CreateRnnWorkspace(stream, workspace_size_in_bytes, workspace_allocator, &workspace);
+  } else {
+    success = CreateRnnWorkspace(stream, miopen.handle(), rnn_desc, input_desc, workspace_allocator, &workspace);
+  }
+  if (!success) {
     LOG(ERROR) << "Unable to create rnn workspace";
     return false;
   }
 
-  // workaround for missing initialization support in MIOpen.
-  // TODO: remove this when MIOpen is ready.
   auto type_size = std::is_same<T, Eigen::half>::value ? 2 : sizeof(T);
+
   auto size_data = input_desc.seq_length() * input_desc.batch_size() *
                    input_desc.data_size();
-  if ((size_data > 0) && (input_backprop_data->opaque() != nullptr))
-    stream->ThenMemZero(input_backprop_data, size_data * type_size);
 
   size_data = input_h_desc.num_layers() * input_h_desc.batch_size() *
               input_h_desc.data_size();
-  if ((size_data > 0) && (input_h_backprop_data->opaque() != nullptr))
-    stream->ThenMemZero(input_h_backprop_data, size_data * type_size);
 
   size_data = input_c_desc.num_layers() * input_c_desc.batch_size() *
               input_c_desc.data_size();
-  if ((size_data > 0) && (input_c_backprop_data->opaque() != nullptr))
-    stream->ThenMemZero(input_c_backprop_data, size_data * type_size);
 
   std::unique_ptr<GpuTimer, GpuTimerDeleter> timer;
   const bool is_profiling = output_profile_result != nullptr;
   if (is_profiling) {
     timer.reset(new GpuTimer(parent_));
-    // The start and stop of the timer should be as close to the Cudnn call as
-    // possible. It is still possible for other threads to issue workload on
-    // to this stream. So it could take multiple profiling measurements.
     if (!timer->Init() || !timer->Start(AsGpuStream(stream))) {
       LOG(ERROR) << "Failed to start timer";
       return false;
     }
   }
 
-  // make the backward data call
-  auto status = wrap::miopenRNNBackwardData(
-      miopen.handle() /*handle*/, rnn_desc.handle() /*rnnDesc*/,
-      model_dims.seq_length /*seqLength*/, output_desc.handles() /*yDesc*/,
-      output_data.opaque() /*y*/, output_desc.handles() /*dyDesc*/,
-      output_backprop_data.opaque() /*dy*/, output_h_desc.handle() /*dhyDesc*/,
-      output_h_backprop_data.opaque() /*dhy*/,
-      output_c_desc.handle() /*dcyDesc*/,
-      output_c_backprop_data.opaque() /*dcy*/,
-      rnn_desc.params_handle() /*wDesc*/, params.opaque() /*w*/,
-      input_h_desc.handle() /*hxDesc*/, input_h_data.opaque() /*hx*/,
-      input_c_desc.handle() /*cxDesc*/, input_c_data.opaque() /*cx*/,
-      input_desc.handles() /*dxDesc*/, input_backprop_data->opaque() /*dx*/,
-      input_h_desc.handle() /*dhxDesc*/,
-      input_h_backprop_data->opaque() /*dhx*/,
-      input_c_desc.handle() /*dcxDesc*/,
-      input_c_backprop_data->opaque() /*dcx*/, workspace.opaque() /*workspace*/,
-      workspace.size() /*workSpaceSizeInBytes*/,
-      reserve_space_data->opaque() /*reserveSpace*/,
-      reserve_space_data->size() /*reserveSpaceSizeInBytes*/);
+  miopenStatus_t status = miopenStatusSuccess;
+  if (input_desc.is_var_seq_lengths()) {
+    status = wrap::miopenRNNBackwardSeqData(
+        miopen.handle(),
+        rnn_desc.handle(),
+        output_desc.seq_tensor_descriptor(),
+        output_data.opaque(),
+        output_backprop_data.opaque(),
+        output_h_desc.handle(),
+        input_h_data.opaque(),
+        output_h_backprop_data.opaque(),
+        input_h_backprop_data->opaque(),
+        output_c_desc.handle(),
+        input_c_data.opaque(),
+        output_c_backprop_data.opaque(),
+        input_c_backprop_data->opaque(),
+        input_desc.seq_tensor_descriptor(),
+        input_backprop_data->opaque(),
+        params.opaque(),
+        weight_space_size,
+        workspace.opaque(),
+        workspace.size(),
+        reserve_space_data->opaque(),
+        reserve_space_data->size());
+  } else {
+    status = wrap::miopenRNNBackwardData(
+        miopen.handle(), rnn_desc.handle(),
+        model_dims.seq_length, output_desc.handles(),
+        output_data.opaque(), output_desc.handles(),
+        output_backprop_data.opaque(), output_h_desc.handle(),
+        output_h_backprop_data.opaque(),
+        output_c_desc.handle(),
+        output_c_backprop_data.opaque(),
+        rnn_desc.params_handle(), params.opaque(),
+        input_h_desc.handle(), input_h_data.opaque(),
+        input_c_desc.handle(), input_c_data.opaque(),
+        input_desc.handles(), input_backprop_data->opaque(),
+        input_h_desc.handle(),
+        input_h_backprop_data->opaque(),
+        input_c_desc.handle(),
+        input_c_backprop_data->opaque(), workspace.opaque(),
+        workspace.size(),
+        reserve_space_data->opaque(),
+        reserve_space_data->size());
+  }
+
   if (status != miopenStatusSuccess) {
-    LOG(ERROR) << "Failed to call miopenRNNBackwardData: " << ToString(status);
+    LOG(ERROR) << "Failed to call RNN backward data: " << ToString(status);
     return false;
   }
 
   if (params_backprop_data != nullptr) {
-    // Clear the dw to zeros.
-    stream->ThenMemZero(params_backprop_data, params_backprop_data->size());
-    // make the backward weight call
-    status = wrap::miopenRNNBackwardWeights(
-        miopen.handle() /*handle*/, rnn_desc.handle() /*rnnDesc*/,
-        model_dims.seq_length /*seqLength*/, input_desc.handles() /*xDesc*/,
-        input_data.opaque() /*x*/, input_h_desc.handle() /*hxDesc*/,
-        input_h_data.opaque() /*hx*/, output_desc.handles() /*yDesc*/,
-        output_data.opaque() /*y*/, rnn_desc.params_handle() /*dwDesc*/,
-        params_backprop_data->opaque() /*dw*/, workspace.opaque() /*workspace*/,
-        workspace.size() /*workSpaceSizeInBytes*/,
-        reserve_space_data->opaque() /*reserveSpace*/,
-        reserve_space_data->size() /*reserveSpaceSizeInBytes*/);
+    if (input_desc.is_var_seq_lengths()) {
+      status = wrap::miopenRNNBackwardWeightsSeqTensor(
+          miopen.handle(),
+          rnn_desc.handle(),
+          input_desc.seq_tensor_descriptor(),
+          input_data.opaque(),
+          input_h_desc.handle(),
+          input_h_data.opaque(),
+          output_desc.seq_tensor_descriptor(),
+          output_data.opaque(),
+          params_backprop_data->opaque(),
+          weight_space_size,
+          workspace.opaque(),
+          workspace.size(),
+          reserve_space_data->opaque(),
+          reserve_space_data->size());
+    } else {
+      status = wrap::miopenRNNBackwardWeights(
+          miopen.handle(), rnn_desc.handle(),
+          model_dims.seq_length, input_desc.handles(),
+          input_data.opaque(), input_h_desc.handle(),
+          input_h_data.opaque(), output_desc.handles(),
+          output_data.opaque(), rnn_desc.params_handle(),
+          params_backprop_data->opaque(), workspace.opaque(),
+          workspace.size(),
+          reserve_space_data->opaque(),
+          reserve_space_data->size());
+    }
+
     if (status != miopenStatusSuccess) {
-      LOG(ERROR) << "Failed to call miopenRNNBackwardWeights: "
-                 << ToString(status);
+      LOG(ERROR) << "Failed to call RNN backward weights: " << ToString(status);
       return false;
     }
   }
@@ -2541,8 +2758,7 @@ bool MIOpenSupport::DoRnnBackwardImpl(
     }
     auto algo_desc = *rnn_desc.algorithm_config().algorithm();
     output_profile_result->set_algorithm(algo_desc);
-    output_profile_result->set_elapsed_time_in_ms(
-        timer->GetElapsedMilliseconds());
+    output_profile_result->set_elapsed_time_in_ms(timer->GetElapsedMilliseconds());
   }
 
   return true;
@@ -2756,10 +2972,6 @@ MIOpenSupport::createRnnDescriptor(
     bool use_padded_io) {
   // ROCM TODO: batch_size is used in dynamic persistent RNN algorithm and is
   // not supported by MIOpen now.
-  if (use_padded_io) {
-    return tsl::Status(absl::StatusCode::kInvalidArgument,
-                       "ROCm MIOpen only supports packed input output.");
-  }
 
   bool use_projection = cell_size != 0 && hidden_size < cell_size;
   if (use_projection) {
@@ -2774,26 +2986,40 @@ MIOpenSupport::createRnnDescriptor(
       ToMIOpenRnnInputMode(input_mode),
       ToMIOpenRnnDirectionMode(direction_mode), ToMIOpenRnnMode(rnn_mode),
       ToMIOpenDataType(data_type), dropout, seed, algorithm_config,
-      state_allocator));
+      state_allocator, use_padded_io));
   if (!rnn_desc->ok()) {
     return rnn_desc->Status();
   }
-  return tsl::StatusOr<std::unique_ptr<dnn::RnnDescriptor>>(
-      std::move(rnn_desc));
+  return tsl::StatusOr<std::unique_ptr<dnn::RnnDescriptor>>(std::move(rnn_desc));
 }
 
 tsl::StatusOr<std::unique_ptr<dnn::RnnSequenceTensorDescriptor>>
 MIOpenSupport::createRnnSequenceTensorDescriptor(int seq_length, int batch_size,
                                                  int data_size,
                                                  dnn::DataType data_type) {
-  std::unique_ptr<MIOpenRnnSequenceTensorDescriptor> seq_desc(
-      new MIOpenRnnSequenceTensorDescriptor(seq_length, batch_size, data_size,
-                                            ToMIOpenDataType(data_type)));
-  if (!seq_desc->ok()) {
-    return seq_desc->Status();
-  }
+  TF_ASSIGN_OR_RETURN(
+    MIOpenRnnSequenceTensorDescriptor descriptor,
+    MIOpenRnnSequenceTensorDescriptor::Create(
+        seq_length, batch_size, data_size, ToMIOpenDataType(data_type)));
   return tsl::StatusOr<std::unique_ptr<dnn::RnnSequenceTensorDescriptor>>(
-      std::move(seq_desc));
+    std::make_unique<MIOpenRnnSequenceTensorDescriptor>(std::move(descriptor)));
+//   return std::make_unique<MIOpenRnnSequenceTensorDescriptor>(std::move(descriptor));
+}
+
+tsl::StatusOr<std::unique_ptr<dnn::RnnSequenceTensorDescriptor>>
+MIOpenSupport::createRnnSequenceTensorDescriptor(int max_seq_length, int batch_size,
+                                  int data_size,
+                                  const absl::Span<const int>& seq_lengths,
+                                  bool time_major, dnn::DataType data_type) {
+  TF_ASSIGN_OR_RETURN(
+    MIOpenRnnSequenceTensorDescriptor descriptor,
+    MIOpenRnnSequenceTensorDescriptor::Create(
+      max_seq_length, batch_size, data_size, ToMIOpenDataType(data_type),
+      time_major, seq_lengths));
+  return tsl::StatusOr<std::unique_ptr<dnn::RnnSequenceTensorDescriptor>>(
+    std::make_unique<MIOpenRnnSequenceTensorDescriptor>(std::move(descriptor)));
+//   return std::make_unique<MIOpenRnnSequenceTensorDescriptor>(
+//       std::move(descriptor));
 }
 
 tsl::StatusOr<std::unique_ptr<dnn::RnnStateTensorDescriptor>>

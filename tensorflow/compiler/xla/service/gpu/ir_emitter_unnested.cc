@@ -1939,6 +1939,7 @@ Status IrEmitterUnnested::EmitLoopFusion(mlir::Operation* op) {
     launch_config.few_waves = false;
   }
 
+  launch_config.unroll_factor = 1;
   TF_ASSIGN_OR_RETURN(
       LaunchDimensions launch_dimensions,
       CalculateLaunchDimensions(element_shape, gpu_device_info, launch_config));
@@ -4801,12 +4802,16 @@ static int CalculateVirtualThreadScalingFactorForReduction(
     const ReductionDimensions& reduction_dimensions,
     const se::CudaComputeCapability& cc) {
   int64_t dimx = reduction_dimensions.dimensions[kDimX];
-  if (reduction_dimensions.is_row_reduction && dimx <= 128) {
+  if (reduction_dimensions.is_row_reduction && dimx <= 32){
+    int rows_per_warp = RowReductionGetRowsPerWarp(dimx);
+    return rows_per_warp * 32;
+  }
+  else if (reduction_dimensions.is_row_reduction && dimx <= 128) {
     int rows_per_warp = RowReductionGetRowsPerWarp(dimx);
     if (cc.IsAtLeast(se::CudaComputeCapability::AMPERE)) {
       return rows_per_warp * 3;
     }
-    return rows_per_warp * 5;
+    return rows_per_warp * 8;
   }
   return 1;
 }

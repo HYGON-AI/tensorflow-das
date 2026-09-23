@@ -6,6 +6,12 @@ workspace(name = "org_tensorflow")
 # restriction that load() statements need to be at the top of .bzl files.
 # E.g. we can not retrieve a new repository with http_archive and then load()
 # a macro from that repository in the same file.
+
+# DTK: Add for GCVM support
+load("@//tensorflow:workspace_gcvm.bzl", "tf_workspace_gcvm")
+
+tf_workspace_gcvm()
+
 load("@//tensorflow:workspace3.bzl", "tf_workspace3")
 
 tf_workspace3()

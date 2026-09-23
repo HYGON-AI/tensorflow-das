@@ -231,6 +231,79 @@ __global__ void UnsortedSegmentCustomKernel(
   }
 }
 
+template <typename T, typename Index, typename KernelReductionFunctor, bool SkipZero>
+__global__ void __launch_bounds__(1024) UnsortedSegmentRegisterOptKernel(
+    const int64_t input_outer_dim_size,
+    const int64_t inner_dim_size,
+    const int64_t output_outer_dim_size,
+    const Index* __restrict__ segment_ids,
+    const T* __restrict__ input,
+    T* __restrict__ output) {
+
+
+    constexpr int LOCAL_BUFFER_SIZE = 2;
+    T local_values[LOCAL_BUFFER_SIZE];
+    Index local_segments[LOCAL_BUFFER_SIZE];
+    int64_t local_offsets[LOCAL_BUFFER_SIZE];
+    int local_count = 0;
+
+    const int64_t input_total_size = input_outer_dim_size * inner_dim_size;
+    const int64_t thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+    const int64_t total_threads = gridDim.x * blockDim.x;
+
+    for (int64_t input_index = thread_id; input_index < input_total_size;
+         input_index += total_threads) {
+
+        const int64_t input_segment_index = input_index / inner_dim_size;
+        const int64_t segment_offset = input_index % inner_dim_size;
+        const Index output_segment_index = segment_ids[input_segment_index];
+
+        const T input_value = input[input_index];
+        if (SkipZero && input_value == static_cast<T>(0)) {
+            continue;
+        }
+
+
+        bool mark = false;
+        for (int i = 0; i < local_count; i++) {
+            if (local_segments[i] == output_segment_index &&
+                local_offsets[i] == segment_offset) {
+                local_values[i] += input_value;
+                mark = true;
+                break;
+            }
+        }
+
+        if (!mark) {
+            if (local_count < LOCAL_BUFFER_SIZE) {
+                local_segments[local_count] = output_segment_index;
+                local_offsets[local_count] = segment_offset;
+                local_values[local_count] = input_value;
+                local_count++;
+            } else {
+                int64_t output_index = local_segments[0] * inner_dim_size + local_offsets[0];
+                KernelReductionFunctor()(output + output_index, local_values[0]);
+
+                for (int i = 0; i < LOCAL_BUFFER_SIZE - 1; i++) {
+                    local_segments[i] = local_segments[i + 1];
+                    local_offsets[i] = local_offsets[i + 1];
+                    local_values[i] = local_values[i + 1];
+                }
+
+                local_segments[LOCAL_BUFFER_SIZE - 1] = output_segment_index;
+                local_offsets[LOCAL_BUFFER_SIZE - 1] = segment_offset;
+                local_values[LOCAL_BUFFER_SIZE - 1] = input_value;
+            }
+        }
+    }
+
+    // 累加剩余的本地缓冲区
+    for (int i = 0; i < local_count; i++) {
+        int64_t output_index = local_segments[i] * inner_dim_size + local_offsets[i];
+        KernelReductionFunctor()(output + output_index, local_values[i]);
+    }
+}
+
 template <typename Tindex, typename Tsegmentids>
 __global__ void SegmentOffsetsKernel(
     Tindex size, Tsegmentids nsegments,
@@ -885,12 +958,23 @@ struct UnsortedSegmentFunctor<GPUDevice, T, Index, InitialValueF, ReductionF> {
       config = GetGpuLaunchConfig(data_size, d);
       using ReductionUpdateOp = typename ReduceUpdateOpFor<ReductionF>::atomic_op;
       constexpr bool SkipZero = ReduceUpdateOpFor<ReductionF>::is_sum;
-      TF_CHECK_OK(GpuLaunchKernel(
-          UnsortedSegmentCustomKernel<
-              T, Index, ReductionUpdateOp, SkipZero>,
-          config.block_count, config.thread_per_block, 0, d.stream(),
-          input_outer_dim_size, input_inner_dim_size, output_outer_dim_size,
-          unsorted_segment_ids.data(), data.data(), output.data()));
+      const char* env_val = std::getenv("Use_UnsortedSegmentRegisterOptKernel");
+      bool use_unsortedSegmentregisteroptkernel = (env_val != nullptr && std::string(env_val) == "1");
+      if (use_unsortedSegmentregisteroptkernel){
+        TF_CHECK_OK(GpuLaunchKernel(
+            UnsortedSegmentRegisterOptKernel<
+                T, Index, ReductionUpdateOp, SkipZero>,
+            config.block_count, config.thread_per_block, 0, d.stream(),
+            input_outer_dim_size, input_inner_dim_size, output_outer_dim_size,
+            unsorted_segment_ids.data(), data.data(), output.data()));
+      } else {
+        TF_CHECK_OK(GpuLaunchKernel(
+            UnsortedSegmentCustomKernel<
+                T, Index, ReductionUpdateOp, SkipZero>,
+            config.block_count, config.thread_per_block, 0, d.stream(),
+            input_outer_dim_size, input_inner_dim_size, output_outer_dim_size,
+            unsorted_segment_ids.data(), data.data(), output.data()));
+      }
     } else {
       // Allocate temporary space and sort segment_ids, then call the sorted
       // implem.
