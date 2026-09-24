@@ -1,4 +1,7 @@
 # Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,6 +46,9 @@ class VersionTest(test.TestCase):
     self.assertEqual(type(versions.GIT_VERSION), str)
     self.assertEqual(type(versions.COMPILER_VERSION), str)
 
+  def testHCUVersionAndIsEqual(self):
+    self.assertEqual(type(versions.__hcu_version__), str)
+    self.assertEqual(versions.__hcu_version__, versions.HCU_VERSION)
 
 if __name__ == '__main__':
   test.main()
