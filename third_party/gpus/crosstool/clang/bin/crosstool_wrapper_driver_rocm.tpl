@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
 """Crosstool wrapper for compiling ROCm programs.
 
 SYNOPSIS:

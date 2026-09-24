@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
 #
 # prerequisites: install python3
 # sudo apt-get install python3-numpy python3-dev python3-pip python3-wheel
