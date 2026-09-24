@@ -155,8 +155,8 @@ static bool IsDeviceSupported(se::StreamExecutor* executor) {
     if (!rocm_compute_capability.is_supported_gfx_version()) {
       LOG(INFO) << "StreamExecutor DTK device (" << executor->device_ordinal()
                 << ") is of unsupported "
-                << "DCU version : " << rocm_compute_capability.gfx_version()
-                << ". The supported DCU versions are "
+                << "HCU version : " << rocm_compute_capability.gfx_version()
+                << ". The supported HCU versions are "
                 << rocm_compute_capability.supported_gfx_versions_str() << ".";
       return false;
     }

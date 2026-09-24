@@ -166,7 +166,7 @@ dispatch.update_docstrings_with_api_lists()
 # Special dunders that we choose to export:
 _exported_dunders = set([
     '__version__',
-    '__dcu_version__',
+    '__hcu_version__',
     '__git_version__',
     '__compiler_version__',
     '__cxx11_abi_flag__',

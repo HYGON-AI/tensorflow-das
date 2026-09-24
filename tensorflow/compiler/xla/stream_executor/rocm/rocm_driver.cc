@@ -1006,7 +1006,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   return tsl::Status(
       absl::StatusCode::kInternal,
       absl::StrFormat("failed to get compute capability for device: %d "
-                      "(unsupported API on DCU)",
+                      "(unsupported API on HCU)",
                       device));
 }
 
@@ -1094,7 +1094,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   *version = 0;
   return tsl::Status{
       absl::StatusCode::kInternal,
-      absl::StrFormat("failed to determine DCU ISA version for device %d",
+      absl::StrFormat("failed to determine HCU ISA version for device %d",
                       device)};
 }
 
@@ -1109,7 +1109,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   *gcnArchName = "";
   return tsl::Status{
       absl::StatusCode::kInternal,
-      absl::StrFormat("failed to determine DCU GCN Arch Name for device %d",
+      absl::StrFormat("failed to determine HCU GCN Arch Name for device %d",
                       device)};
 }
 
@@ -1131,7 +1131,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   }
   return tsl::Status{
       absl::StatusCode::kInternal,
-      absl::StrFormat("failed to determine DCU GCN Arch Name for device %d",
+      absl::StrFormat("failed to determine HCU GCN Arch Name for device %d",
                       dev)};
 }
 

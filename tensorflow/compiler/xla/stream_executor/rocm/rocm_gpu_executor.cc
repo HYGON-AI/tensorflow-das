@@ -199,13 +199,13 @@ bool GpuExecutor::FindOnDiskForISAVersion(absl::string_view filename,
   string cc_specific =
       absl::StrCat(filename, ".cc", version_, canonical_suffix);
   if (tsl::Env::Default()->FileExists(cc_specific).ok()) {
-    VLOG(2) << "found DCU ISA version-specific file, using that: "
+    VLOG(2) << "found HCU ISA version-specific file, using that: "
             << cc_specific;
     *found_filename = cc_specific;
     return true;
   }
 
-  VLOG(2) << "could not find DCU ISA version-specific file at: "
+  VLOG(2) << "could not find HCU ISA version-specific file at: "
           << cc_specific;
   if (tsl::Env::Default()->FileExists(string(filename)).ok()) {
     *found_filename = string(filename);
@@ -966,7 +966,7 @@ GpuExecutor::CreateDeviceDescription(int device_ordinal) {
   }
 
   builder.set_platform_version(
-      absl::StrCat("DCU ISA version: ", gcn_arch_name));
+      absl::StrCat("HCU ISA version: ", gcn_arch_name));
 
   // TODO(leary) should be a way to query this from the driver, but this is
   // unlikely to change for us any time soon.
