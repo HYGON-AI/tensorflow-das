@@ -243,7 +243,7 @@ def main():
   if VERBOSE: 
     print('PWD=' + os.getcwd())
     print('HIPCC_ENV=' + HIPCC_ENV)
-    print('ROCM_AMDGPU_TARGETS= ' + ROCM_AMDGPU_TARGETS)
+    print('ROCM_HCU_device_TARGETS= ' + ROCM_AMDGPU_TARGETS)
 
   if args.x and args.x[0] == 'rocm':
     # compilation for GPU objects

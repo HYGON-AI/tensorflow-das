@@ -178,7 +178,7 @@ Status GpuExecutable::CheckCompatibilityWithServiceExecutableRunOptions(
     std::string gpu_exec_arch =
         std::get<se::RocmComputeCapability>(gpu_version_).gcn_arch_name();
     TF_RET_CHECK(stream_arch == gpu_exec_arch)
-        << "AMDGPU GCN ISA version mismatch; expected {" << gpu_exec_arch
+        << "HCU device GCN ISA version mismatch; expected {" << gpu_exec_arch
         << ", but was " << stream_arch;
   } else if (platform_kind == stream_executor::PlatformKind::kCuda) {
     GpuVersion cc = main_stream->GetCudaComputeCapability();

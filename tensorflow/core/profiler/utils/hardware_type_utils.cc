@@ -128,13 +128,13 @@ absl::string_view GpuModelName(const DeviceCapabilities& device_cap) {
   } else if (device_cap.device_vendor() == kDeviceVendorAMD) {
     switch (device_cap.compute_capability().major()) {
       case 9:
-        return "AMD GPU - gfx-9XX series";
+        return "HCU device - gfx-9XX series";
       case 10:
-        return "AMD GPU - gfx-10XX series";
+        return "HCU device - gfx-10XX series";
       case 11:
-        return "AMD GPU - gfx-11XX series";
+        return "HCU device - gfx-11XX series";
       default:
-        return "AMD GPU";
+        return "HCU device";
     }
   } else {
     LOG(ERROR) << "Unknown device vendor " << device_cap.device_vendor();

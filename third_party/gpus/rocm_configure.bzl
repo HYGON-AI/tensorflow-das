@@ -236,7 +236,7 @@ def _amdgpu_targets(repository_ctx, rocm_toolkit_path, bash_bin):
     amdgpu_targets = amdgpu_targets_str.split(",")
     for amdgpu_target in amdgpu_targets:
         if amdgpu_target[:3] != "gfx":
-            auto_configure_fail("Invalid AMDGPU target: %s" % amdgpu_target)
+            auto_configure_fail("Invalid HCU device target: %s" % amdgpu_target)
     return amdgpu_targets
 
 def _hipcc_env(repository_ctx):

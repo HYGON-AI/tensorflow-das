@@ -114,7 +114,7 @@ Status AMDGPUCompiler::OptimizeHloPostLayoutAssignment(
   TF_RETURN_IF_ERROR(GpuCompiler::OptimizeHloPostLayoutAssignment(
       hlo_module, stream_exec, options, gpu_target_config, autotune_results));
 
-  HloPassPipeline post_pipeline("AMDGPU post-layout_assignment");
+  HloPassPipeline post_pipeline("HCU device post-layout_assignment");
 
   // Transform TriangularSolve ops into custom-calls, so we can add temp
   // memory.
@@ -150,7 +150,7 @@ AMDGPUCompiler::CompileTargetBinary(const HloModuleConfig& module_config,
   std::vector<uint8_t> hsaco;
   {
     XLA_SCOPED_LOGGING_TIMER(
-        "AMDGPUCompiler::CompileTargetBinary - CompileToHsaco");
+        "HCUDeviceCompiler::CompileTargetBinary - CompileToHsaco");
     TF_ASSIGN_OR_RETURN(
         hsaco, amdgpu::CompileToHsaco(llvm_module, gpu_version, module_config,
                                       rocdl_dir_));
