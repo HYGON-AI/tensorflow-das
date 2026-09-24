@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
+
 # Description: GPU-specific XLA tests. For example, codegen tests that
 # verify the IR emitted.
 

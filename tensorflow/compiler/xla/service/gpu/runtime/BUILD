@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
+
 load("//tensorflow:tensorflow.bzl", "tf_cc_test","tf_cc_binary")
 load("//tensorflow/tsl/platform/default:cuda_build_defs.bzl", "if_cuda_is_configured")
 load("//tensorflow/compiler/xla:xla.bzl", "xla_cc_test")

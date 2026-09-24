@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
+
 # Description:
 #   GPU-specific components in XLA service implementation.
 
