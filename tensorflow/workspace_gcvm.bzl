@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Hygon Information Technology Co., Ltd.
 # SPDX-License-Identifier: Apache-2.0
-# Modified by Hygon Information Technology Co., Ltd., 2026.
+
 # DTK: Add for GCVM support
 """TensorFlow workspace initialization. Consult the WORKSPACE on how to use it."""
 def workspace():
