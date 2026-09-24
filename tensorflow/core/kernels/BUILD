@@ -5062,11 +5062,15 @@ tf_kernel_library(
     name = "sparse_tensor_dense_matmul_op",
     prefix = "sparse_tensor_dense_matmul_op",
     deps = SPARSE_DEPS + [
+        "//tensorflow/core/common_runtime:dma_helper",
         ":fill_functor",
         "//tensorflow/core/framework:bounds_check",
         "//tensorflow/core/util:determinism_for_kernels",
+        "//tensorflow/core/util:env_var",
         "//third_party/eigen3",
-    ],
+    ] + if_cuda_or_rocm([
+        "//tensorflow/core/platform:stream_executor",
+    ]),
 )
 
 tf_kernel_library(
@@ -5339,6 +5343,26 @@ tf_kernel_library(
         ":scatter_nd_util",
         ":training_op_helpers",
         ":variable_ops",
+    ],
+)
+
+tf_kernel_library(
+    name = "fused_embedding_lookup_reduce_op",
+    srcs = [
+        "fused_embedding_lookup_reduce_op.cc",
+    ],
+    hdrs = [
+        "fused_embedding_lookup_reduce_op.h",
+    ],
+    gpu_srcs = [
+        "fused_embedding_lookup_reduce_op.h",
+        "fused_embedding_lookup_reduce_op_gpu.cu.cc",
+    ],
+    deps = [
+        "//tensorflow/core/framework:bounds_check",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
+        "//third_party/eigen3",
     ],
 )
 

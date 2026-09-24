@@ -521,23 +521,21 @@ auto BlasLt::GetGroupedMatmulPlan(Stream *stream,
             GemmEpilogue{});
   std::vector< GemmInputs > inputs(cfg.batch_count);
   for(int64_t i = 0; i < cfg.batch_count; i++) {
-    inputs[i].a = const_cast< void * >(cfg.a[i]);
-    inputs[i].b = const_cast< void * >(cfg.b[i]);
-    inputs[i].c = const_cast< void * >(cfg.c[i]);
-    inputs[i].d = cfg.d[i];
-    inputs[i].alpha = const_cast< void * >(cfg.alpha);
-    inputs[i].beta = const_cast< void * >(cfg.beta);
+    inputs[i].setA(cfg.a[i]);
+    inputs[i].setB(cfg.b[i]);
+    inputs[i].setC(cfg.c[i]);
+    inputs[i].setD(cfg.d[i]);
+    inputs[i].setAlpha(cfg.alpha);
+    inputs[i].setBeta(cfg.beta);
   }
 
-  GemmProblemType problem = {
-    .op_a = AsHipblasOperation(cfg.trans_a),
-    .op_b = AsHipblasOperation(cfg.trans_b),
-    .type_a = AsHipblasDataType(cfg.type_a),
-    .type_b = AsHipblasDataType(cfg.type_b),
-    .type_c = AsHipblasDataType(cfg.type_c),
-    .type_d = AsHipblasDataType(cfg.type_d),
-    .type_compute = AsHipblasComputeType(cfg.compute_type)
-  };
+  GemmProblemType problem(AsHipblasOperation(cfg.trans_a),
+                          AsHipblasOperation(cfg.trans_b),
+                          AsHipblasDataType(cfg.type_a),
+                          AsHipblasDataType(cfg.type_b),
+                          AsHipblasDataType(cfg.type_c),
+                          AsHipblasDataType(cfg.type_d),
+                          AsHipblasComputeType(cfg.compute_type));
 
   uint64 mem_size = cfg.batch_count * sizeof(UserArguments);
   {
@@ -618,13 +616,13 @@ auto BlasLt::GroupedMatmulPlan::GetAlgorithms(
 
   SE_HIPBLAS_RETURN_IF_ERROR(getAllAlgos(blas_lt_ref_.blas_lt_.get(),
                                        GemmType::HIPBLASLT_GROUPED_GEMM,
-                                       problem.op_a,
-                                       problem.op_b,
-                                       problem.type_a,
-                                       problem.type_b,
-                                       problem.type_c,
-                                       problem.type_d,
-                                       problem.type_compute,
+                                       problem.getOpA(),
+                                       problem.getOpB(),
+                                       problem.getTypeA(),
+                                       problem.getTypeB(),
+                                       problem.getTypeC(),
+                                       problem.getTypeD(),
+                                       problem.getTypeCompute(),
                                        heuristicResult));
   // SE_HIPBLAS_RETURN_IF_ERROR(
   //       grouped_gemm_->algoGetHeuristic(max_algorithm_count, gemmPref, 

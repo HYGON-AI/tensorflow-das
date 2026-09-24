@@ -17,6 +17,9 @@ limitations under the License.
 
 #define EIGEN_USE_THREADS
 
+#include <mutex>
+
+#include "tensorflow/core/common_runtime/dma_helper.h"
 #include "tensorflow/core/kernels/sparse_tensor_dense_matmul_op.h"
 
 #include "tensorflow/core/framework/bounds_check.h"
@@ -24,11 +27,32 @@ limitations under the License.
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/kernels/fill_functor.h"
 #include "tensorflow/core/platform/bfloat16.h"
+#include "tensorflow/core/platform/stream_executor.h"
+#include "tensorflow/core/util/env_var.h"
 
 namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
 typedef Eigen::GpuDevice GPUDevice;
+
+namespace {
+
+bool EnableSparseTensorDenseMatMulAShapeCache() {
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+  static const bool enabled = [] {
+    bool value = false;
+    TF_CHECK_OK(ReadBoolFromEnvVar(
+        "TF_ENABLE_SPARSE_TENSOR_DENSE_MATMUL_A_SHAPE_CACHE",
+        /*default_val=*/false, &value));
+    return value;
+  }();
+  return enabled;
+#else
+  return false;
+#endif
+}
+
+}  // namespace
 
 template <typename Device, typename T, typename Tindices>
 class SparseTensorDenseMatMulOp : public OpKernel {
@@ -76,11 +100,15 @@ class SparseTensorDenseMatMulOp : public OpKernel {
         errors::InvalidArgument("Number of columns of a_indices does not match "
                                 "number of entries in a_shape"));
 
-    auto a_shape_t = a_shape->vec<int64_t>();
-    const int64_t outer_left = (adjoint_a_) ? a_shape_t(1) : a_shape_t(0);
+    int64_t a_shape_dim0 = 0;
+    int64_t a_shape_dim1 = 0;
+    OP_REQUIRES_OK(ctx, GetAShapeValues(ctx, *a_shape, &a_shape_dim0,
+                                        &a_shape_dim1));
+
+    const int64_t outer_left = (adjoint_a_) ? a_shape_dim1 : a_shape_dim0;
     const int64_t outer_right =
         (adjoint_b_) ? b->shape().dim_size(0) : b->shape().dim_size(1);
-    const int64_t inner_left = (adjoint_a_) ? a_shape_t(0) : a_shape_t(1);
+    const int64_t inner_left = (adjoint_a_) ? a_shape_dim0 : a_shape_dim1;
     const int64_t inner_right =
         (adjoint_b_) ? b->shape().dim_size(1) : b->shape().dim_size(0);
 
@@ -91,7 +119,7 @@ class SparseTensorDenseMatMulOp : public OpKernel {
             inner_left, " vs. ", inner_right,
             ".  Did you forget a transpose?  "
             "Dimensions of A: [",
-            a_shape_t(0), ", ", a_shape_t(1),
+            a_shape_dim0, ", ", a_shape_dim1,
             ").  Dimensions of B: ", b->shape().DebugString()));
 
     if (std::is_same<Device, GPUDevice>::value) {
@@ -151,8 +179,76 @@ class SparseTensorDenseMatMulOp : public OpKernel {
   }
 
  private:
+  Status GetAShapeValues(OpKernelContext* ctx, const Tensor& a_shape,
+                         int64_t* dim0, int64_t* dim1) {
+    if (std::is_same<Device, GPUDevice>::value &&
+        a_shape.GetMemoryType() == AllocatorMemoryType::kDevice) {
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+      TensorBuffer* root_buffer =
+          DMAHelper::buffer(const_cast<Tensor*>(&a_shape))->root_buffer();
+      const void* data_ptr = DMAHelper::base(&a_shape);
+      if (EnableSparseTensorDenseMatMulAShapeCache()) {
+        std::lock_guard<std::mutex> lock(a_shape_cache_mu_);
+        if (cached_a_shape_valid_ &&
+            cached_a_shape_root_buffer_ == root_buffer &&
+            cached_a_shape_data_ptr_ == data_ptr) {
+          *dim0 = cached_a_shape_dim0_;
+          *dim1 = cached_a_shape_dim1_;
+          return OkStatus();
+        }
+      }
+
+      auto* device_context = ctx->op_device_context();
+      if (device_context == nullptr || device_context->stream() == nullptr) {
+        return errors::Internal(
+            "No GPU stream available to read SparseTensorDenseMatMul a_shape");
+      }
+
+      int64_t host_shape[2] = {0, 0};
+      if (!device_context->stream()
+               ->ThenMemcpy(host_shape,
+                            se::DeviceMemoryBase(const_cast<void*>(data_ptr),
+                                                 a_shape.TotalBytes()),
+                            a_shape.TotalBytes())
+               .ok()) {
+        return errors::Internal(
+            "Failed to enqueue SparseTensorDenseMatMul a_shape copy");
+      }
+      TF_RETURN_IF_ERROR(device_context->stream()->BlockHostUntilDone());
+
+      if (EnableSparseTensorDenseMatMulAShapeCache()) {
+        std::lock_guard<std::mutex> lock(a_shape_cache_mu_);
+        cached_a_shape_root_buffer_ = root_buffer;
+        cached_a_shape_data_ptr_ = data_ptr;
+        cached_a_shape_dim0_ = host_shape[0];
+        cached_a_shape_dim1_ = host_shape[1];
+        cached_a_shape_valid_ = true;
+      }
+      *dim0 = host_shape[0];
+      *dim1 = host_shape[1];
+      return OkStatus();
+#else
+      return errors::Internal(
+          "GPU device a_shape is unsupported in this build configuration");
+#endif
+    }
+
+    auto a_shape_t = a_shape.vec<int64_t>();
+    *dim0 = a_shape_t(0);
+    *dim1 = a_shape_t(1);
+    return OkStatus();
+  }
+
   bool adjoint_a_;
   bool adjoint_b_;
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+  mutable std::mutex a_shape_cache_mu_;
+  mutable TensorBuffer* cached_a_shape_root_buffer_ = nullptr;
+  mutable const void* cached_a_shape_data_ptr_ = nullptr;
+  mutable int64_t cached_a_shape_dim0_ = 0;
+  mutable int64_t cached_a_shape_dim1_ = 0;
+  mutable bool cached_a_shape_valid_ = false;
+#endif
 };
 
 #define REGISTER_CPU(TypeT, TypeIndex)           \
@@ -217,8 +313,7 @@ DECLARE_ADJOINT_GPU_SPEC(complex128);
       Name("SparseTensorDenseMatMul")            \
           .Device(DEVICE_GPU)                    \
           .TypeConstraint<TypeT>("T")            \
-          .TypeConstraint<TypeIndex>("Tindices") \
-          .HostMemory("a_shape"),                \
+          .TypeConstraint<TypeIndex>("Tindices"), \
       SparseTensorDenseMatMulOp<GPUDevice, TypeT, TypeIndex>);
 
 #define REGISTER_KERNELS_GPU(T) \

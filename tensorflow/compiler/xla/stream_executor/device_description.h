@@ -184,6 +184,7 @@ class RocmComputeCapability {
         "gfx928",  // KONGMING-E
         "gfx936",  // BOWEN
         "gfx938",  // NMZ
+        "gfx92a"   // YUEYING
     };
   }
   std::set<std::string> gfx_versions_with_nhwc_layout_support() {
@@ -195,7 +196,7 @@ class RocmComputeCapability {
   }
   std::set<std::string> gfx_versions_with_fast_fp16_support() {
     return {"gfx906", "gfx908", "gfx90a", "gfx940", "gfx941", "gfx942", "gfx1030",
-            "gfx926", "gfx928", "gfx936", "gfx938"};
+            "gfx926", "gfx928", "gfx936", "gfx938", "gfx92a"};
   }
   std::set<std::string> gfx_versions_with_mfma_instr_support() {
     return {"gfx908", "gfx90a", "gfx940", "gfx941", "gfx942"};

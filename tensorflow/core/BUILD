@@ -585,6 +585,7 @@ cc_library(
         "//tensorflow/core/kernels:fact_op",
         "//tensorflow/core/kernels:fake_quant_ops",
         "//tensorflow/core/kernels:filesystem_ops",
+        "//tensorflow/core/kernels:fused_embedding_lookup_reduce_op",
         "//tensorflow/core/kernels:function_ops",
         "//tensorflow/core/kernels:functional_ops",
         "//tensorflow/core/kernels:grappler",

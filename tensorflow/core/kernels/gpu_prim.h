@@ -80,11 +80,35 @@ struct NumericTraits<tensorflow::bfloat16>
 }  // namespace cub
 #elif TENSORFLOW_USE_ROCM
 #include "hipcub/hipcub.hpp"
+#if __has_include("hipcub/hipcub_version.hpp")
+#include "hipcub/hipcub_version.hpp"
+#endif
 #include "rocm/rocm_config.h"
 namespace gpuprim = ::hipcub;
 
 // Required for sorting Eigen::half and bfloat16.
 namespace rocprim {
+#if defined(HIPCUB_VERSION) && HIPCUB_VERSION >= 400200
+namespace traits {
+template <>
+struct define<Eigen::half> {
+  using is_arithmetic = traits::is_arithmetic::values<true>;
+  using number_format =
+      traits::number_format::values<traits::number_format::kind::floating_point_type>;
+  using float_bit_mask =
+      traits::float_bit_mask::values<uint16_t, 0x8000, 0x7C00, 0x03FF>;
+};
+
+template <>
+struct define<Eigen::bfloat16> {
+  using is_arithmetic = traits::is_arithmetic::values<true>;
+  using number_format =
+      traits::number_format::values<traits::number_format::kind::floating_point_type>;
+  using float_bit_mask =
+      traits::float_bit_mask::values<uint16_t, 0x8000, 0x7F80, 0x007F>;
+};
+}  // namespace traits
+#else
 namespace detail {
 #if (TF_ROCM_VERSION >= 50200)
 template <>
@@ -110,6 +134,7 @@ template <>
 struct radix_key_codec_base<tensorflow::bfloat16>
     : radix_key_codec_floating<tensorflow::bfloat16, uint16_t> {};
 };  // namespace detail
+#endif
 };  // namespace rocprim
 
 #endif  // TENSORFLOW_USE_ROCM
