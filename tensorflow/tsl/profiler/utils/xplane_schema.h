@@ -1,4 +1,7 @@
 /* Copyright 2019 The TensorFlow Authors. All Rights Reserved.
+Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+SPDX-License-Identifier: Apache-2.0
+Modified by Hygon Information Technology Co., Ltd., 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -73,6 +76,7 @@ TF_CONST_INIT extern const absl::string_view kSourceLineName;
 // GPU device vendors.
 TF_CONST_INIT extern const absl::string_view kDeviceVendorNvidia;
 TF_CONST_INIT extern const absl::string_view kDeviceVendorAMD;
+TF_CONST_INIT extern const absl::string_view kDeviceVendorHCU;
 
 // Interesting event types (i.e., TraceMe names).
 enum HostEventType {

@@ -1,4 +1,7 @@
 /* Copyright 2021 The TensorFlow Authors. All Rights Reserved.
+Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+SPDX-License-Identifier: Apache-2.0
+Modified by Hygon Information Technology Co., Ltd., 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,6 +57,7 @@ using tsl::profiler::FindOrAddMutablePlaneWithName;
 using tsl::profiler::GetStatTypeStr;
 using tsl::profiler::GpuPlaneName;
 using tsl::profiler::kDeviceVendorAMD;
+using tsl::profiler::kDeviceVendorHCU;
 using tsl::profiler::kThreadIdOverhead;
 using tsl::profiler::ParseAnnotationStack;
 using tsl::profiler::ProfilerInterface;
@@ -545,7 +549,7 @@ class RocmTraceCollectorImpl : public profiler::RocmTraceCollector {
                                XPlaneBuilder* device_plane) {
       device_plane->AddStatValue(*device_plane->GetOrCreateStatMetadata(
                                      GetStatTypeStr(StatType::kDevVendor)),
-                                 kDeviceVendorAMD);
+                                 kDeviceVendorHCU);
 
       if (hipGetDeviceProperties(&device_properties_, device_ordinal) !=
           hipSuccess)
