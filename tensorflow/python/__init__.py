@@ -1,4 +1,7 @@
 # Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -163,7 +166,7 @@ dispatch.update_docstrings_with_api_lists()
 # Special dunders that we choose to export:
 _exported_dunders = set([
     '__version__',
-    '__dcu_version__',
+    '__hcu_version__',
     '__git_version__',
     '__compiler_version__',
     '__cxx11_abi_flag__',

@@ -1,4 +1,7 @@
 /* Copyright 2017 The TensorFlow Authors. All Rights Reserved.
+Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+SPDX-License-Identifier: Apache-2.0
+Modified by Hygon Information Technology Co., Ltd., 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1942,7 +1945,7 @@ Status BaseGPUDeviceFactory::GetValidDeviceIds(
     VLOG(1) << "Found device " << i << " with properties: "
             << "\npciBusID: " << description->pci_bus_id()
             << " name: " << description->name()
-            << "     DTK AMDGPU Arch: " << gcn_arch_name
+            << "     DTK HCU device Arch: " << gcn_arch_name
             << "\ncoreClock: " << description->clock_rate_ghz() << "GHz"
             << " coreCount: " << description->core_count()
             << " deviceMemorySize: "
@@ -2015,9 +2018,9 @@ Status BaseGPUDeviceFactory::GetValidDeviceIds(
       LOG(INFO) << "Ignoring visible gpu device "
                 << "(" << GetShortDeviceDescription(visible_gpu_id, *desc)
                 << ") "
-                << "with DCU version : "
+                << "with HCU version : "
                 << rocm_compute_capability.gfx_version()
-                << ". The supported DCU versions are "
+                << ". The supported HCU versions are "
                 << rocm_compute_capability.supported_gfx_versions_str() << ".";
       continue;
     }

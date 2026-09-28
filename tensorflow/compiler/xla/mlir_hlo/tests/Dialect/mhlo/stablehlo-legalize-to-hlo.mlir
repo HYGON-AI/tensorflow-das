@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Modified by Hygon Information Technology Co., Ltd., 2026.
+
 // RUN: mlir-hlo-opt --stablehlo-legalize-to-hlo --mlir-print-op-generic --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // ============ ATTRIBUTES ============

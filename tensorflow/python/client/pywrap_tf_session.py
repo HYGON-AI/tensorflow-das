@@ -1,4 +1,7 @@
 # Copyright 2019 The TensorFlow Authors. All Rights Reserved.
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +33,7 @@ from tensorflow.python.util import tf_stack
 # https://pybind11.readthedocs.io/en/stable/advanced/cast/strings.html#returning-c-strings-to-python
 # pylint: disable=undefined-variable
 __version__ = str(get_version())
-__dcu_version__ = "unknown"
+__hcu_version__ = "unknown"
 __git_version__ = str(get_git_version())
 __compiler_version__ = str(get_compiler_version())
 __cxx11_abi_flag__ = get_cxx11_abi_flag()

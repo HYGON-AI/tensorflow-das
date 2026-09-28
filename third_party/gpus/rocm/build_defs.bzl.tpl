@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
+
 # Macros for building ROCm code.
 def if_rocm(if_true, if_false = []):
     """Shorthand for select()'ing on whether we're building with ROCm.

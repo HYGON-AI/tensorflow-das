@@ -1,4 +1,6 @@
 /* Copyright 2023 The OpenXLA Authors.
+SPDX-License-Identifier: Apache-2.0
+Modified by Hygon Information Technology Co., Ltd., 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,6 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
+
 #ifndef XLA_SERVICE_GPU_AUTOTUNER_UTIL_H_
 #define XLA_SERVICE_GPU_AUTOTUNER_UTIL_H_
 

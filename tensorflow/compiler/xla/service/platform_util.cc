@@ -1,4 +1,7 @@
 /* Copyright 2017 The TensorFlow Authors. All Rights Reserved.
+Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+SPDX-License-Identifier: Apache-2.0
+Modified by Hygon Information Technology Co., Ltd., 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -152,8 +155,8 @@ static bool IsDeviceSupported(se::StreamExecutor* executor) {
     if (!rocm_compute_capability.is_supported_gfx_version()) {
       LOG(INFO) << "StreamExecutor DTK device (" << executor->device_ordinal()
                 << ") is of unsupported "
-                << "DCU version : " << rocm_compute_capability.gfx_version()
-                << ". The supported DCU versions are "
+                << "HCU version : " << rocm_compute_capability.gfx_version()
+                << ". The supported HCU versions are "
                 << rocm_compute_capability.supported_gfx_versions_str() << ".";
       return false;
     }

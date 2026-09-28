@@ -1,4 +1,7 @@
 /* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+SPDX-License-Identifier: Apache-2.0
+Modified by Hygon Information Technology Co., Ltd., 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1003,7 +1006,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   return tsl::Status(
       absl::StatusCode::kInternal,
       absl::StrFormat("failed to get compute capability for device: %d "
-                      "(unsupported API on DCU)",
+                      "(unsupported API on HCU)",
                       device));
 }
 
@@ -1091,7 +1094,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   *version = 0;
   return tsl::Status{
       absl::StatusCode::kInternal,
-      absl::StrFormat("failed to determine DCU ISA version for device %d",
+      absl::StrFormat("failed to determine HCU ISA version for device %d",
                       device)};
 }
 
@@ -1106,7 +1109,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   *gcnArchName = "";
   return tsl::Status{
       absl::StatusCode::kInternal,
-      absl::StrFormat("failed to determine DCU GCN Arch Name for device %d",
+      absl::StrFormat("failed to determine HCU GCN Arch Name for device %d",
                       device)};
 }
 
@@ -1128,7 +1131,7 @@ GpuDriver::ContextGetSharedMemConfig(GpuContext* context) {
   }
   return tsl::Status{
       absl::StatusCode::kInternal,
-      absl::StrFormat("failed to determine DCU GCN Arch Name for device %d",
+      absl::StrFormat("failed to determine HCU GCN Arch Name for device %d",
                       dev)};
 }
 
