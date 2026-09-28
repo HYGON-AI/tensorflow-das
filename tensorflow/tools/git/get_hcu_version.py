@@ -28,12 +28,11 @@ def abi_value():
 
 def dtk_version_value():
     try:
-       dtk_path=os.getenv('ROCM_PATH')
+       dtk_path = os.getenv('ROCM_PATH')
        dtk_version_path = os.path.join(dtk_path, '.info', "version-dev")
-       with open(dtk_version_path, 'r',encoding='utf-8') as file:
-           lines = file.readlines()
-       dtk_version="dtk"+lines[0][:].replace(".", "")
-       return dtk_version
+       with open(dtk_version_path, 'r', encoding='utf-8') as file:
+           version = file.readline().strip().split("-", 1)[0]
+       return "dtk" + version.replace(".", "")
     except Exception:
        return UNKNOWN
 
