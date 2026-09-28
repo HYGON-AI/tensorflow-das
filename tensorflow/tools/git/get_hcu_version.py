@@ -55,14 +55,29 @@ def hcu_version():
         return hcu_version
     except Exception:
         return UNKNOWN
-def replace_name(file_path, line_number, newline):
+def replace_name(file_path, marker, newline):
     with open(file_path, 'r') as file:
         lines = file.readlines()
-    if 0 < line_number <= len(lines):
-        lines[line_number - 1] = newline + '\n'
+    matches = [
+        i for i, line in enumerate(lines)
+        if line.lstrip().startswith(marker)
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"Expected one occurrence of {marker} in {file_path}"
+        )
+    lines[matches[0]] = newline + '\n'
     with open(file_path, 'w') as file:
         file.writelines(lines)
 
 if __name__ == "__main__":
-    replace_name(file_path="./tensorflow/python/client/pywrap_tf_session.py", line_number=36, newline = f'__hcu_version__ = "2.13.1+{tfwhl_name()}"')
-    replace_name(file_path="./tensorflow/tools/pip_package/setup.py", line_number=327, newline = f"    version=_VERSION.replace('-', '')+str('+{tfwhl_name()}'),")
+    replace_name(
+        file_path="./tensorflow/python/client/pywrap_tf_session.py",
+        marker="__hcu_version__ =",
+        newline=f'__hcu_version__ = "2.13.1+{tfwhl_name()}"')
+    replace_name(
+        file_path="./tensorflow/tools/pip_package/setup.py",
+        marker="version=_VERSION.replace(",
+        newline=(
+            f"    version=_VERSION.replace('-', '')"
+            f"+str('+{tfwhl_name()}'),"))

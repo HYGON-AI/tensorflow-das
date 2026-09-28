@@ -480,10 +480,11 @@ bool IrEmitter::IsEmittingForAMDGPU() const {
 
 void IrEmitter::EmitAMDGPUAtomicAdd(llvm::Value* output_address,
                                     llvm::Value* source) {
-  // CHECK(IsEmittingForAMDGPU());
-  if (!IsEmittingForAMDGPU()) {
-      LOG(FATAL) << "Expected HCU GPU code generation target when emitting atomic add.";
-    }
+  if (TF_PREDICT_FALSE(!IsEmittingForAMDGPU())) {
+    LOG(FATAL)
+      << "Check failed: expected HCU GPU code generation target "
+         "when emitting atomic add.";
+  }
   auto output_address_type =
       llvm::dyn_cast<llvm::PointerType>(output_address->getType());
   CHECK_NE(output_address_type, nullptr);
