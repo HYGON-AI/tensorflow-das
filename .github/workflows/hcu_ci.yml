@@ -1,0 +1,204 @@
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Organization variables:
+#   BASE_COMPILE_IMAGE_ROCKY_PY311  Bare Rocky Linux compile image.
+#
+# Optional repository variables:
+#   HCU_PYTHON_BIN                  Python executable, default: python3.11.
+#   HCU_DTK_VERSION                 DTK version, default: 26.04.2.
+#   HCU_DTK_DOWNLOAD_BASE_URL       DTK download server base URL.
+#   HCU_PIP_INDEX_URL               Python package index URL.
+#   HCU_AMDGPU_TARGETS              Compile targets. When empty, detect them
+#                                   from the HCU devices attached to the runner.
+#   HCU_VISIBLE_DEVICES             Test devices, default: 0. At most two
+#                                   devices should be exposed to this workflow.
+#   HCU_BAZEL_TEST_TARGETS          Space-separated Bazel test targets.
+
+name: CI HCU
+
+permissions:
+  contents: read
+
+on:
+  pull_request_target:
+    branches:
+      - r2.13-das
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tensorflow/**"
+      - "third_party/**"
+      - "tools/**"
+      - ".github/workflows/ci/**"
+      - "BUILD"
+      - "WORKSPACE"
+      - ".bazelrc"
+      - ".bazelversion"
+      - "configure"
+      - "configure.py"
+      - ".github/workflows/hcu_ci.yml"
+  push:
+    branches:
+      - r2.13-das
+    paths:
+      - "tensorflow/**"
+      - "third_party/**"
+      - "tools/**"
+      - ".github/workflows/ci/**"
+      - "BUILD"
+      - "WORKSPACE"
+      - ".bazelrc"
+      - ".bazelversion"
+      - "configure"
+      - "configure.py"
+      - ".github/workflows/hcu_ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/r2.13-das' }}
+
+jobs:
+  manual_approval:
+    name: Manual approval for HCU CI
+    runs-on: ubuntu-latest
+    environment: ci-protection
+    if: ${{ github.event_name == 'pull_request_target' }}
+    steps:
+      - run: echo "Waiting for approval before running PR code on the HCU runner."
+
+  tensorflow:
+    name: TensorFlow Linux x86 HCU
+    timeout-minutes: 720
+    needs: [manual_approval]
+    if: ${{ always() && (needs.manual_approval.result == 'success' || needs.manual_approval.result == 'skipped') }}
+    runs-on: [self-hosted, bw1100]
+    env:
+      DTK_VERSION: ${{ vars.HCU_DTK_VERSION || '26.04.2' }}
+      DTK_DOWNLOAD_BASE_URL: ${{ vars.HCU_DTK_DOWNLOAD_BASE_URL || 'https://download.sourcefind.cn:65024/file/1' }}
+      PYTHON_BIN: ${{ vars.HCU_PYTHON_BIN || 'python3.11' }}
+      TF_ROCM_AMDGPU_TARGETS: ${{ vars.HCU_AMDGPU_TARGETS }}
+      HCU_VISIBLE_DEVICES: ${{ vars.HCU_VISIBLE_DEVICES || '0' }}
+      HCU_BAZEL_TEST_TARGETS: ${{ vars.HCU_BAZEL_TEST_TARGETS }}
+      BAZEL_OUTPUT_USER_ROOT: ${{ github.workspace }}/.bazel-output
+    container:
+      image: ${{ vars.BASE_COMPILE_IMAGE_ROCKY_PY311 }}
+      volumes:
+        - /opt/hyhal:/opt/hyhal:ro
+      options: >-
+        --privileged
+        --user root
+        --device=/dev/kfd
+        --device=/dev/dri
+        --group-add video
+        --ipc=host
+        --shm-size=64G
+        --cap-add=SYS_PTRACE
+        --security-opt=seccomp=unconfined
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out tensorflow-das
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          path: tensorflow-das
+          persist-credentials: false
+
+      - name: Verify checked-out PR commit
+        if: ${{ github.event_name == 'pull_request_target' }}
+        working-directory: tensorflow-das
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          actual_sha="$(git rev-parse HEAD)"
+          if [[ "${actual_sha}" != "${EXPECTED_SHA}" ]]; then
+            echo "::error::Checked out ${actual_sha}, expected approved PR commit ${EXPECTED_SHA}."
+            exit 1
+          fi
+
+      - name: Configure pip index
+        env:
+          PIP_INDEX_URL: ${{ vars.HCU_PIP_INDEX_URL || 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple' }}
+        run: |
+          pip_host="$(awk -F/ '{print $3}' <<<"${PIP_INDEX_URL}" | cut -d: -f1)"
+          printf '[global]\nindex-url = %s\ntrusted-host = %s\ntimeout = 120\n' \
+            "${PIP_INDEX_URL}" "${pip_host}" | tee /etc/pip.conf
+
+      - name: Install DTK and Bazel
+        working-directory: tensorflow-das
+        run: bash .github/workflows/ci/setup_hcu_ci_env.sh
+
+      - name: Install TensorFlow build dependencies
+        working-directory: tensorflow-das
+        run: |
+          "${PYTHON_BIN}" -m pip install --upgrade pip setuptools wheel
+          "${PYTHON_BIN}" -m pip install \
+            keras_preprocessing \
+            packaging==23.1 \
+            requests \
+            urllib3==1.25 \
+            protobuf==3.20.3 \
+            'scipy<1.15' \
+            portpicker \
+            numpy==1.24.3 \
+            patchelf==0.19.1.0 \
+            auditwheel
+
+      - name: Show build environment
+        working-directory: tensorflow-das
+        run: |
+          source /opt/dtk/env.sh
+          [[ ! -f /opt/dtk/env.hipblaslt ]] || source /opt/dtk/env.hipblaslt
+          lscpu
+          "${PYTHON_BIN}" -V
+          bazel --version
+          command -v hipcc
+          hipcc --version
+          echo "HCU targets=${TF_ROCM_AMDGPU_TARGETS:-auto-detect}"
+          "${ROCM_PATH:-/opt/dtk}/bin/rocminfo"
+
+      - name: Build TensorFlow wheel
+        working-directory: tensorflow-das
+        run: bash .github/workflows/ci/build_tensorflow_dtk.sh
+
+      - name: Install TensorFlow wheel
+        working-directory: tensorflow-das
+        run: |
+          shopt -s nullglob
+          wheels=(dist/*.whl)
+          if (( ${#wheels[@]} != 1 )); then
+            echo "::error::Expected exactly one TensorFlow wheel, found ${#wheels[@]}."
+            printf '%s\n' "${wheels[@]}"
+            exit 1
+          fi
+          "${PYTHON_BIN}" -m pip install --force-reinstall "${wheels[0]}"
+
+      - name: Test TensorFlow on HCU
+        working-directory: tensorflow-das
+        run: bash .github/workflows/ci/run_tensorflow_hcu_tests.sh
+
+      - name: Upload TensorFlow test artifacts
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tensorflow-hcu-test-artifacts-${{ github.run_id }}
+          path: |
+            tensorflow-das/test_logs/
+            tensorflow-das/bazel-testlogs/**/test.log
+            tensorflow-das/bazel-testlogs/**/test.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload TensorFlow wheel
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tensorflow-hcu-wheel-${{ github.run_id }}
+          path: tensorflow-das/dist/
+          if-no-files-found: warn
+          retention-days: 7
