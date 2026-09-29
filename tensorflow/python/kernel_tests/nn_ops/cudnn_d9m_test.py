@@ -1,4 +1,7 @@
 # Copyright 2019 The TensorFlow Authors. All Rights Reserved.
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
 """Tests for TF_CUDNN_DETERMINISTIC=1."""
 
 import os
@@ -25,5 +29,6 @@ if __name__ == '__main__':
   # Note that the effect of setting the following environment variable to
   # 'true' is not tested. Unless we can find a simpler pattern for testing these
   # environment variables, it would require another test file to be added.
+  os.environ['MIOPEN_DEBUG_CONVOLUTION_DETERMINISTIC'] = '1'
   os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
   test.main()

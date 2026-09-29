@@ -1,4 +1,7 @@
 /* Copyright 2017 The TensorFlow Authors. All Rights Reserved.
+Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+SPDX-License-Identifier: Apache-2.0
+Modified by Hygon Information Technology Co., Ltd., 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -477,7 +480,11 @@ bool IrEmitter::IsEmittingForAMDGPU() const {
 
 void IrEmitter::EmitAMDGPUAtomicAdd(llvm::Value* output_address,
                                     llvm::Value* source) {
-  CHECK(IsEmittingForAMDGPU());
+  if (TF_PREDICT_FALSE(!IsEmittingForAMDGPU())) {
+    LOG(FATAL)
+      << "Check failed: expected HCU GPU code generation target "
+         "when emitting atomic add.";
+  }
   auto output_address_type =
       llvm::dyn_cast<llvm::PointerType>(output_address->getType());
   CHECK_NE(output_address_type, nullptr);

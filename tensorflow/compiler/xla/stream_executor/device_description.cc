@@ -1,4 +1,7 @@
 /* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+SPDX-License-Identifier: Apache-2.0
+Modified by Hygon Information Technology Co., Ltd., 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -97,7 +100,7 @@ std::unique_ptr<std::map<std::string, std::string>> DeviceDescription::ToMap()
 
   result["CUDA Compute Capability"] = cuda_compute_capability().ToString();
 
-  result["AMDGPU GCN Arch Name"] = rocm_compute_capability().gcn_arch_name();
+  result["HCU device GCN Arch Name"] = rocm_compute_capability().gcn_arch_name();
 
   result["NUMA Node"] = absl::StrCat(numa_node());
   result["Core Count"] = absl::StrCat(core_count());

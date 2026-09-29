@@ -28,9 +28,9 @@ def abi_value():
 
 def dtk_version_value():
     try:
-       dtk_path=os.getenv('ROCM_PATH')
+       dtk_path = os.getenv('ROCM_PATH')
        dtk_version_path = os.path.join(dtk_path, '.info', "version-dev")
-       with open(dtk_version_path, 'r',encoding='utf-8') as file:
+       with open(dtk_version_path, 'r', encoding='utf-8') as file:
            version = file.readline().strip().split("-", 1)[0]
        return "dtk" + version.replace(".", "")
     except Exception:
@@ -47,24 +47,36 @@ def tfwhl_name():
     except Exception:
         return UNKNOWN
 
-def dcu_version():
+def hcu_version():
     try:
         tf_version = '2.13.1'
-        dcu_version = tf_version + tfwhl_name()
-        return dcu_version
+        hcu_version = tf_version + tfwhl_name()
+        return hcu_version
     except Exception:
         return UNKNOWN
 def replace_name(file_path, marker, newline):
     with open(file_path, 'r') as file:
         lines = file.readlines()
-    matches = [i for i, line in enumerate(lines)
-               if line.lstrip().startswith(marker)]
+    matches = [
+        i for i, line in enumerate(lines)
+        if line.lstrip().startswith(marker)
+    ]
     if len(matches) != 1:
-        raise ValueError(f"Expected one occurrence of {marker} in {file_path}")
+        raise ValueError(
+            f"Expected one occurrence of {marker} in {file_path}"
+        )
     lines[matches[0]] = newline + '\n'
     with open(file_path, 'w') as file:
         file.writelines(lines)
 
 if __name__ == "__main__":
-    replace_name(file_path="./tensorflow/python/client/pywrap_tf_session.py", marker="__hcu_version__ =", newline=f'__hcu_version__ = "2.13.1+{tfwhl_name()}"')
-    replace_name(file_path="./tensorflow/tools/pip_package/setup.py", marker="version=_VERSION.replace(", newline=f"    version=_VERSION.replace('-', '')+str('+{tfwhl_name()}'),")
+    replace_name(
+        file_path="./tensorflow/python/client/pywrap_tf_session.py",
+        marker="__hcu_version__ =",
+        newline=f'__hcu_version__ = "2.13.1+{tfwhl_name()}"')
+    replace_name(
+        file_path="./tensorflow/tools/pip_package/setup.py",
+        marker="version=_VERSION.replace(",
+        newline=(
+            f"    version=_VERSION.replace('-', '')"
+            f"+str('+{tfwhl_name()}'),"))

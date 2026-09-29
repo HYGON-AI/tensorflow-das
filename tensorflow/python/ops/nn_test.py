@@ -1,4 +1,7 @@
 # Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+# Modified by Hygon Information Technology Co., Ltd., 2026.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+
 """Tests for miscellaneous functionality in tensorflow.ops.nn."""
 
 import functools
@@ -313,6 +317,9 @@ class L2NormalizeTest(test_lib.TestCase):
         y_tf = nn_impl.l2_normalize(x_tf, dim)
         self.assertAllClose(y_np, self.evaluate(y_tf))
 
+def _generator_uniform(shape, dtype, seed):
+    return stateful_random_ops.Generator.from_seed(seed).uniform(
+        shape=shape, dtype=dtype)
 
 DROPOUT_FNS = [
     ("stateful_v1", nn_ops.dropout),
@@ -321,9 +328,8 @@ DROPOUT_FNS = [
     ("stateless_philox", functools.partial(
         nn_ops.stateless_dropout, seed=(1, 2), rng_alg="philox")),
     ("generator", functools.partial(  # pylint: disable=g-long-lambda
-        nn_ops.general_dropout, uniform_sampler=lambda shape, dtype: (  # pylint: disable=g-long-lambda
-            stateful_random_ops.Generator.from_seed(1).uniform(
-                shape=shape, dtype=dtype)))),
+        nn_ops.general_dropout, uniform_sampler=functools.partial(
+            _generator_uniform, seed=1))),
     ]
 
 
