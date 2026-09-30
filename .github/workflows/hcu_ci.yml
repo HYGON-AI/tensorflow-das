@@ -11,9 +11,10 @@
 #   HCU_PIP_INDEX_URL               Python package index URL.
 #   HCU_AMDGPU_TARGETS              Compile targets. When empty, detect them
 #                                   from the HCU devices attached to the runner.
-#   HCU_VISIBLE_DEVICES             Test devices, default: 0. At most two
+#   HCU_VISIBLE_DEVICES             Test devices, default: 0,1. At most two
 #                                   devices should be exposed to this workflow.
 #   HCU_BAZEL_TEST_TARGETS          Space-separated Bazel test targets.
+#   HCU_LOCAL_TEST_JOBS             Concurrent Bazel tests, default: 1.
 
 name: CI HCU
 
@@ -29,7 +30,7 @@ on:
       - "tensorflow/**"
       - "third_party/**"
       - "tools/**"
-      - ".github/workflows/ci/**"
+      - "scripts/ci/**"
       - "BUILD"
       - "WORKSPACE"
       - ".bazelrc"
@@ -44,7 +45,7 @@ on:
       - "tensorflow/**"
       - "third_party/**"
       - "tools/**"
-      - ".github/workflows/ci/**"
+      - "scripts/ci/**"
       - "BUILD"
       - "WORKSPACE"
       - ".bazelrc"
@@ -78,8 +79,9 @@ jobs:
       DTK_DOWNLOAD_BASE_URL: ${{ vars.HCU_DTK_DOWNLOAD_BASE_URL || 'https://download.sourcefind.cn:65024/file/1' }}
       PYTHON_BIN: ${{ vars.HCU_PYTHON_BIN || 'python3.11' }}
       TF_ROCM_AMDGPU_TARGETS: ${{ vars.HCU_AMDGPU_TARGETS }}
-      HCU_VISIBLE_DEVICES: ${{ vars.HCU_VISIBLE_DEVICES || '0' }}
+      HCU_VISIBLE_DEVICES: ${{ vars.HCU_VISIBLE_DEVICES || '0,1' }}
       HCU_BAZEL_TEST_TARGETS: ${{ vars.HCU_BAZEL_TEST_TARGETS }}
+      HCU_LOCAL_TEST_JOBS: ${{ vars.HCU_LOCAL_TEST_JOBS || '1' }}
       BAZEL_OUTPUT_USER_ROOT: ${{ github.workspace }}/.bazel-output
     container:
       image: ${{ vars.BASE_COMPILE_IMAGE_ROCKY_PY311 }}
@@ -129,7 +131,7 @@ jobs:
 
       - name: Install DTK and Bazel
         working-directory: tensorflow-das
-        run: bash .github/workflows/ci/setup_hcu_ci_env.sh
+        run: bash scripts/ci/setup_hcu_ci_env.sh
 
       - name: Install TensorFlow build dependencies
         working-directory: tensorflow-das
@@ -162,7 +164,7 @@ jobs:
 
       - name: Build TensorFlow wheel
         working-directory: tensorflow-das
-        run: bash .github/workflows/ci/build_tensorflow_dtk.sh
+        run: bash scripts/ci/build_tensorflow_dtk.sh
 
       - name: Install TensorFlow wheel
         working-directory: tensorflow-das
@@ -178,7 +180,7 @@ jobs:
 
       - name: Test TensorFlow on HCU
         working-directory: tensorflow-das
-        run: bash .github/workflows/ci/run_tensorflow_hcu_tests.sh
+        run: bash scripts/ci/run_tensorflow_hcu_tests.sh
 
       - name: Upload TensorFlow test artifacts
         if: always()

@@ -4,13 +4,16 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DTK_DIR="${DTK_DIR:-/opt/dtk}"
 PYTHON_BIN="${PYTHON_BIN:-python3.11}"
 BAZEL_BIN="${BAZEL_BIN:-bazel}"
 HCU_VISIBLE_DEVICES="${HCU_VISIBLE_DEVICES:-0}"
 TF_ROCM_AMDGPU_TARGETS="${TF_ROCM_AMDGPU_TARGETS:-${HCU_TARGETS:-}}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/test_logs/tensorflow-hcu}"
+TEST_TARGETS_FILE="${HCU_TEST_TARGETS_FILE:-${ROOT_DIR}/scripts/ci/tensorflow_bazel_test_targets.txt}"
+EXPECTED_TEST_TARGET_COUNT="${HCU_EXPECTED_TEST_TARGET_COUNT:-1490}"
+HCU_LOCAL_TEST_JOBS="${HCU_LOCAL_TEST_JOBS:-1}"
 
 if [[ ! -f "${DTK_DIR}/env.sh" ]]; then
   echo "ERROR: DTK environment not found: ${DTK_DIR}/env.sh" >&2
@@ -70,19 +73,49 @@ np.testing.assert_allclose(result.numpy(), expected, rtol=1e-5, atol=1e-5)
 print("GPU matmul result:", result.numpy())
 PY
 
+target_source=""
 if (( $# > 0 )); then
   test_targets=("$@")
+  target_source="command-line arguments"
 elif [[ -n "${HCU_BAZEL_TEST_TARGETS:-}" ]]; then
   read -r -a test_targets <<<"${HCU_BAZEL_TEST_TARGETS}"
+  target_source="HCU_BAZEL_TEST_TARGETS"
 else
-  test_targets=(
-    //tensorflow/python/kernel_tests/nn_ops:conv_ops_test
-    //tensorflow/python/kernel_tests/math_ops:segment_reduction_ops_test
+  if [[ ! -f "${TEST_TARGETS_FILE}" ]]; then
+    echo "ERROR: Bazel test target manifest not found: ${TEST_TARGETS_FILE}" >&2
+    exit 1
+  fi
+  if [[ -n "${EXPECTED_TEST_TARGET_COUNT}" ]] &&
+      [[ ! "${EXPECTED_TEST_TARGET_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: HCU_EXPECTED_TEST_TARGET_COUNT must be a positive integer or empty." >&2
+    exit 1
+  fi
+  mapfile -t test_targets < <(
+    sed \
+      -e 's/[[:space:]]*#.*$//' \
+      -e '/^[[:space:]]*$/d' \
+      "${TEST_TARGETS_FILE}"
   )
+  target_source="${TEST_TARGETS_FILE}"
+
+  unique_target_count="$(printf '%s\n' "${test_targets[@]}" | sort -u | wc -l)"
+  if (( ${#test_targets[@]} != unique_target_count )); then
+    echo "ERROR: duplicate targets found in ${TEST_TARGETS_FILE}." >&2
+    exit 1
+  fi
+  if [[ -n "${EXPECTED_TEST_TARGET_COUNT}" ]] &&
+      (( ${#test_targets[@]} != EXPECTED_TEST_TARGET_COUNT )); then
+    echo "ERROR: expected ${EXPECTED_TEST_TARGET_COUNT} approved Bazel targets, found ${#test_targets[@]}." >&2
+    exit 1
+  fi
 fi
 
 if (( ${#test_targets[@]} == 0 )); then
   echo "ERROR: no Bazel test targets were selected." >&2
+  exit 1
+fi
+if [[ ! "${HCU_LOCAL_TEST_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ERROR: HCU_LOCAL_TEST_JOBS must be a positive integer, got: ${HCU_LOCAL_TEST_JOBS}" >&2
   exit 1
 fi
 
@@ -92,6 +125,9 @@ if [[ -n "${BAZEL_OUTPUT_USER_ROOT:-}" ]]; then
   bazel_startup_args+=("--output_user_root=${BAZEL_OUTPUT_USER_ROOT}")
 fi
 
+selected_targets_file="${LOG_DIR}/selected_targets.txt"
+printf '%s\n' "${test_targets[@]}" | sort -u > "${selected_targets_file}"
+
 bazel_test_args=(
   --remote_timeout=300
   -c opt
@@ -100,6 +136,8 @@ bazel_test_args=(
   --test_output=errors
   --test_timeout=1800
   --keep_going
+  --test_sharding_strategy=disabled
+  "--local_test_jobs=${HCU_LOCAL_TEST_JOBS}"
   "--repo_env=TF_ROCM_AMDGPU_TARGETS=${TF_ROCM_AMDGPU_TARGETS:-}"
   "--test_env=HIP_VISIBLE_DEVICES=${HIP_VISIBLE_DEVICES}"
   "--test_env=ROCR_VISIBLE_DEVICES=${ROCR_VISIBLE_DEVICES}"
@@ -121,8 +159,8 @@ if [[ -n "${BAZEL_JOBS:-}" ]]; then
   bazel_test_args+=("--jobs=${BAZEL_JOBS}")
 fi
 
-echo "Running Bazel tests:"
-printf '  %s\n' "${test_targets[@]}"
+echo "Running ${#test_targets[@]} Bazel tests from ${target_source}"
+echo "Selected target list: ${selected_targets_file}"
 
 cd "${ROOT_DIR}"
 "${BAZEL_BIN}" "${bazel_startup_args[@]}" test \

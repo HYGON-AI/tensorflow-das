@@ -392,21 +392,22 @@ PY
 
 ### 10.3 运行 HCU 测试
 
-仓库提供了 HCU 验证脚本，默认只使用设备 0，并运行卷积和 segment reduction 测试：
+仓库提供了 HCU 验证脚本。默认读取 `scripts/ci/tensorflow_bazel_test_targets.txt`
+中的 1490 个已审查 Bazel target，并使用两张以内的 HCU 卡串行执行测试：
 
 ```bash
 cd /path/to/tensorflow-das
 source /opt/dtk/env.sh
 
-HCU_VISIBLE_DEVICES=0 \
+HCU_VISIBLE_DEVICES=0,1 \
 PYTHON_BIN="$(command -v python)" \
-bash .github/workflows/ci/run_tensorflow_hcu_tests.sh
+bash scripts/ci/run_tensorflow_hcu_tests.sh
 ```
 
 如需执行指定 Bazel 测试，可以把目标直接传给脚本：
 
 ```bash
-bash .github/workflows/ci/run_tensorflow_hcu_tests.sh \
+bash scripts/ci/run_tensorflow_hcu_tests.sh \
   //tensorflow/python/kernel_tests/nn_ops:conv_ops_test \
   //tensorflow/python/kernel_tests/math_ops:segment_reduction_ops_test
 ```
@@ -415,7 +416,7 @@ bash .github/workflows/ci/run_tensorflow_hcu_tests.sh \
 
 ```bash
 HCU_VISIBLE_DEVICES=0,1 \
-  bash .github/workflows/ci/run_tensorflow_hcu_tests.sh <bazel-targets...>
+  bash scripts/ci/run_tensorflow_hcu_tests.sh <bazel-targets...>
 ```
 
 ## 11. wheel 检查

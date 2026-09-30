@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DTK_DIR="${DTK_DIR:-/opt/dtk}"
 PYTHON_BIN="${PYTHON_BIN:-python3.11}"
 OUT_DIR="${OUT_DIR:-${ROOT_DIR}/dist}"
@@ -59,17 +59,20 @@ echo "  hipcc                   $(${ROCM_PATH}/bin/hipcc --version | head -n1)"
 # configure is interactive. Preserve its exit status while avoiding the SIGPIPE
 # status produced by `yes` when configure finishes reading its input.
 set +o pipefail
-yes "" | env \
-  TF_NEED_ROCM=1 \
-  TF_NEED_CUDA=0 \
-  ROCM_PATH="${ROCM_PATH}" \
-  TF_ROCM_AMDGPU_TARGETS="${TF_ROCM_AMDGPU_TARGETS}" \
-  PYTHON_BIN_PATH="${PYTHON_BIN_PATH}" \
-  USE_DEFAULT_PYTHON_LIB_PATH=1 \
-  ./configure
-configure_status="${PIPESTATUS[1]}"
+if yes "" | env \
+    TF_NEED_ROCM=1 \
+    TF_NEED_CUDA=0 \
+    ROCM_PATH="${ROCM_PATH}" \
+    TF_ROCM_AMDGPU_TARGETS="${TF_ROCM_AMDGPU_TARGETS}" \
+    PYTHON_BIN_PATH="${PYTHON_BIN_PATH}" \
+    USE_DEFAULT_PYTHON_LIB_PATH=1 \
+    ./configure; then
+  configure_status=0
+else
+  configure_status="${PIPESTATUS[1]}"
+fi
 set -o pipefail
-if [[ "${configure_status}" -ne 0 ]]; then
+if (( configure_status != 0 )); then
   echo "ERROR: TensorFlow configure failed with exit code ${configure_status}." >&2
   exit "${configure_status}"
 fi
