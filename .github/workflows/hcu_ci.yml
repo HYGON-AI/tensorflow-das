@@ -6,7 +6,7 @@
 #
 # Optional repository variables:
 #   HCU_PYTHON_BIN                  Python executable, default: python3.11.
-#   HCU_DTK_VERSION                 DTK version, default: 26.04.2.
+#   HCU_DTK_VERSION                 DTK version, default: 26.10.
 #   HCU_DTK_DOWNLOAD_BASE_URL       DTK download server base URL.
 #   HCU_PIP_INDEX_URL               Python package index URL.
 #   HCU_AMDGPU_TARGETS              Compile targets. When empty, detect them
@@ -62,7 +62,7 @@ concurrency:
 jobs:
   manual_approval:
     name: Manual approval for HCU CI
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, bw1100]
     environment: ci-protection
     if: ${{ github.event_name == 'pull_request_target' }}
     steps:
@@ -75,7 +75,7 @@ jobs:
     if: ${{ always() && (needs.manual_approval.result == 'success' || needs.manual_approval.result == 'skipped') }}
     runs-on: [self-hosted, bw1100]
     env:
-      DTK_VERSION: ${{ vars.HCU_DTK_VERSION || '26.04.2' }}
+      DTK_VERSION: ${{ vars.HCU_DTK_VERSION || '26.10' }}
       DTK_DOWNLOAD_BASE_URL: ${{ vars.HCU_DTK_DOWNLOAD_BASE_URL || 'https://download.sourcefind.cn:65024/file/1' }}
       PYTHON_BIN: ${{ vars.HCU_PYTHON_BIN || 'python3.11' }}
       TF_ROCM_AMDGPU_TARGETS: ${{ vars.HCU_AMDGPU_TARGETS }}

@@ -14,7 +14,7 @@ TensorFlow 2.13.1 DAS 版本。TensorFlow 2.13.1 的设备代码后端使用 GCV
 | 项目 | 支持或推荐值 |
 | --- | --- |
 | TensorFlow | `2.13.1` |
-| DTK | `26.04`、`26.04.2`，推荐 `26.04.2` |
+| DTK | `26.04`、`26.10`，推荐 `26.10` |
 | Python | `3.10`、`3.11`，推荐 `3.11` |
 | Bazel | `5.3.0` |
 | 编译后端 | GCVM |
@@ -261,10 +261,10 @@ bazel-bin/tensorflow/tools/pip_package/build_pip_package dist
 ls -lh dist/*.whl
 ```
 
-DTK 26.04.2 对应的版本示例为：
+DTK 26.10 对应的版本示例为：
 
 ```text
-2.13.1+das.opt1.dtk26042
+2.13.1+das.opt1.dtk2610
 ```
 
 实际 wheel 文件名还会包含 Python ABI 和平台标签。
