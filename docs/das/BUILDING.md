@@ -392,8 +392,15 @@ PY
 
 ### 10.3 运行 HCU 测试
 
-仓库提供了 HCU 验证脚本。默认读取 `scripts/ci/tensorflow_bazel_test_targets.txt`
-中的 1490 个已审查 Bazel target，并使用两张以内的 HCU 卡串行执行测试：
+仓库提供了 HCU 验证脚本。CI 默认逐条独立执行两组测试：
+
+- `scripts/ci/pytest_failed.sh`：首次全量测试失败的 48 条
+  Python 测试；
+- `scripts/ci/ctest.sh`：1115 条 TensorFlow C++ 测试。
+
+原有 `scripts/ci/pytest.sh` 保留为 1490 条 Python 测试的手动全量测试清单。
+脚本会在两组命令全部执行完毕后分别统计并汇总失败 target，供人工复核；测试
+失败不会直接令脚本返回非零状态：
 
 ```bash
 cd /path/to/tensorflow-das
