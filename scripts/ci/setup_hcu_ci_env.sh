@@ -7,13 +7,18 @@
 
 set -euo pipefail
 
-DTK_VERSION="${DTK_VERSION:-26.04.2}"
+DTK_VERSION="${DTK_VERSION:-26.10}"
 DTK_DIR="${DTK_DIR:-/opt/dtk}"
 DTK_DOWNLOAD_BASE_URL="${DTK_DOWNLOAD_BASE_URL:-https://download.sourcefind.cn:65024/file/1}"
 BAZELISK_VERSION="${BAZELISK_VERSION:-1.28.1}"
 TF_ROCM_AMDGPU_TARGETS="${TF_ROCM_AMDGPU_TARGETS:-}"
 
-WGET_OPTS=(--timeout=30 --tries=3 -q)
+if [[ "${DTK_VERSION}" == "26.04.2" ]]; then
+  echo "WARNING: DTK 26.04.2 has been renamed to 26.10; using 26.10." >&2
+  DTK_VERSION="26.10"
+fi
+
+WGET_OPTS=(--timeout=30 --tries=3 --progress=dot:giga)
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "ERROR: this setup script must run as root." >&2
@@ -27,14 +32,18 @@ normalize_targets() {
 }
 
 install_dtk() {
-  local archive="/tmp/dtk-${DTK_VERSION}.tar.gz"
+  local archive
   local url="${DTK_DOWNLOAD_BASE_URL%/}/DTK-${DTK_VERSION}/Rocky8.6/DTK-${DTK_VERSION}-Rocky8.6-x86_64.tar.gz"
+
+  archive="$(mktemp "${TMPDIR:-/tmp}/dtk-${DTK_VERSION}.XXXXXX")"
+  trap 'rm -f -- "${archive}"' EXIT
 
   echo "Installing DTK ${DTK_VERSION} from ${url}"
   wget "${WGET_OPTS[@]}" "${url}" -O "${archive}"
   mkdir -p "${DTK_DIR}"
   tar -xzf "${archive}" -C "${DTK_DIR}" --strip-components=1
-  rm -f "${archive}"
+  rm -f -- "${archive}"
+  trap - EXIT
 
   if [[ ! -f "${DTK_DIR}/env.sh" ]]; then
     echo "ERROR: ${DTK_DIR}/env.sh is missing after DTK extraction." >&2

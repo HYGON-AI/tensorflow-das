@@ -14,7 +14,7 @@ TensorFlow 2.13.1 DAS 版本。TensorFlow 2.13.1 的设备代码后端使用 GCV
 | 项目 | 支持或推荐值 |
 | --- | --- |
 | TensorFlow | `2.13.1` |
-| DTK | `26.04`、`26.04.2`，推荐 `26.04.2` |
+| DTK | `26.04`、`26.10`，推荐 `26.10` |
 | Python | `3.10`、`3.11`，推荐 `3.11` |
 | Bazel | `5.3.0` |
 | 编译后端 | GCVM |
@@ -261,10 +261,10 @@ bazel-bin/tensorflow/tools/pip_package/build_pip_package dist
 ls -lh dist/*.whl
 ```
 
-DTK 26.04.2 对应的版本示例为：
+DTK 26.10 对应的版本示例为：
 
 ```text
-2.13.1+das.opt1.dtk26042
+2.13.1+das.opt1.dtk2610
 ```
 
 实际 wheel 文件名还会包含 Python ABI 和平台标签。
@@ -392,8 +392,15 @@ PY
 
 ### 10.3 运行 HCU 测试
 
-仓库提供了 HCU 验证脚本。默认读取 `scripts/ci/tensorflow_bazel_test_targets.txt`
-中的 1490 个已审查 Bazel target，并使用两张以内的 HCU 卡串行执行测试：
+仓库提供了 HCU 验证脚本。CI 默认逐条独立执行两组测试：
+
+- `scripts/ci/pytest_failed.sh`：首次全量测试失败的 48 条
+  Python 测试；
+- `scripts/ci/ctest.sh`：1115 条 TensorFlow C++ 测试。
+
+原有 `scripts/ci/pytest.sh` 保留为 1490 条 Python 测试的手动全量测试清单。
+脚本会在两组命令全部执行完毕后分别统计并汇总失败 target，供人工复核；测试
+失败不会直接令脚本返回非零状态：
 
 ```bash
 cd /path/to/tensorflow-das

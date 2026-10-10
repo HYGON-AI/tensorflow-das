@@ -6,7 +6,7 @@
 #
 # Optional repository variables:
 #   HCU_PYTHON_BIN                  Python executable, default: python3.11.
-#   HCU_DTK_VERSION                 DTK version, default: 26.04.2.
+#   HCU_DTK_VERSION                 DTK version, default: 26.10.
 #   HCU_DTK_DOWNLOAD_BASE_URL       DTK download server base URL.
 #   HCU_PIP_INDEX_URL               Python package index URL.
 #   HCU_AMDGPU_TARGETS              Compile targets. When empty, detect them
@@ -14,7 +14,6 @@
 #   HCU_VISIBLE_DEVICES             Test devices, default: 0,1. At most two
 #                                   devices should be exposed to this workflow.
 #   HCU_BAZEL_TEST_TARGETS          Space-separated Bazel test targets.
-#   HCU_LOCAL_TEST_JOBS             Concurrent Bazel tests, default: 1.
 
 name: CI HCU
 
@@ -62,7 +61,7 @@ concurrency:
 jobs:
   manual_approval:
     name: Manual approval for HCU CI
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, nmz1]
     environment: ci-protection
     if: ${{ github.event_name == 'pull_request_target' }}
     steps:
@@ -70,18 +69,17 @@ jobs:
 
   tensorflow:
     name: TensorFlow Linux x86 HCU
-    timeout-minutes: 720
+    timeout-minutes: 1080
     needs: [manual_approval]
     if: ${{ always() && (needs.manual_approval.result == 'success' || needs.manual_approval.result == 'skipped') }}
-    runs-on: [self-hosted, bw1100]
+    runs-on: [self-hosted, nmz1]
     env:
-      DTK_VERSION: ${{ vars.HCU_DTK_VERSION || '26.04.2' }}
+      DTK_VERSION: ${{ vars.HCU_DTK_VERSION || '26.10' }}
       DTK_DOWNLOAD_BASE_URL: ${{ vars.HCU_DTK_DOWNLOAD_BASE_URL || 'https://download.sourcefind.cn:65024/file/1' }}
       PYTHON_BIN: ${{ vars.HCU_PYTHON_BIN || 'python3.11' }}
       TF_ROCM_AMDGPU_TARGETS: ${{ vars.HCU_AMDGPU_TARGETS }}
       HCU_VISIBLE_DEVICES: ${{ vars.HCU_VISIBLE_DEVICES || '0,1' }}
       HCU_BAZEL_TEST_TARGETS: ${{ vars.HCU_BAZEL_TEST_TARGETS }}
-      HCU_LOCAL_TEST_JOBS: ${{ vars.HCU_LOCAL_TEST_JOBS || '1' }}
       BAZEL_OUTPUT_USER_ROOT: ${{ github.workspace }}/.bazel-output
     container:
       image: ${{ vars.BASE_COMPILE_IMAGE_ROCKY_PY311 }}
