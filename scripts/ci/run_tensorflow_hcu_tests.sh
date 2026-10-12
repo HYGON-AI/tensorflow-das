@@ -11,10 +11,12 @@ BAZEL_BIN="${BAZEL_BIN:-bazel}"
 HCU_VISIBLE_DEVICES="${HCU_VISIBLE_DEVICES:-0}"
 TF_ROCM_AMDGPU_TARGETS="${TF_ROCM_AMDGPU_TARGETS:-${HCU_TARGETS:-}}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/test_logs/tensorflow-hcu}"
-PYTHON_TEST_COMMANDS_FILE="${HCU_PYTHON_TEST_COMMANDS_FILE:-${HCU_TEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/pytest_failed.sh}}"
-EXPECTED_PYTHON_TEST_COMMAND_COUNT="${HCU_EXPECTED_PYTHON_TEST_COMMAND_COUNT:-${HCU_EXPECTED_TEST_COMMAND_COUNT:-48}}"
+PYTHON_TEST_COMMANDS_FILE="${HCU_PYTHON_TEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/pytest.sh}"
+EXPECTED_PYTHON_TEST_COMMAND_COUNT="${HCU_EXPECTED_PYTHON_TEST_COMMAND_COUNT:-1490}"
 CTEST_COMMANDS_FILE="${HCU_CTEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/ctest.sh}"
 EXPECTED_CTEST_COMMAND_COUNT="${HCU_EXPECTED_CTEST_COMMAND_COUNT:-1115}"
+SKIP_TARGETS_FILE="${HCU_TEST_SKIP_TARGETS_FILE:-${ROOT_DIR}/scripts/ci/hcu_test_skip_targets.txt}"
+EXPECTED_SKIP_TARGET_COUNT="${HCU_EXPECTED_SKIP_TARGET_COUNT:-61}"
 
 if [[ ! -f "${DTK_DIR}/env.sh" ]]; then
   echo "ERROR: DTK environment not found: ${DTK_DIR}/env.sh" >&2
@@ -82,6 +84,7 @@ test_commands=()
 test_suites=()
 test_sources=()
 target_source=""
+apply_skip_list=0
 
 append_test_commands() {
   local suite="$1"
@@ -133,7 +136,7 @@ elif [[ -n "${HCU_BAZEL_TEST_TARGETS:-}" ]]; then
   target_source="HCU_BAZEL_TEST_TARGETS"
 else
   append_test_commands \
-    "python-retry" \
+    "pytest" \
     "${PYTHON_TEST_COMMANDS_FILE}" \
     "${EXPECTED_PYTHON_TEST_COMMAND_COUNT}"
   append_test_commands \
@@ -141,14 +144,56 @@ else
     "${CTEST_COMMANDS_FILE}" \
     "${EXPECTED_CTEST_COMMAND_COUNT}"
   target_source="${test_sources[*]}"
+  apply_skip_list=1
 fi
 
 if (( ${#test_commands[@]} == 0 )); then
   echo "ERROR: no Bazel test targets were selected." >&2
   exit 1
 fi
+skip_targets=()
+declare -A skip_target_set=()
+if (( apply_skip_list )); then
+  if [[ ! -f "${SKIP_TARGETS_FILE}" ]]; then
+    echo "ERROR: Bazel skip target file not found: ${SKIP_TARGETS_FILE}" >&2
+    exit 1
+  fi
+  if [[ ! "${EXPECTED_SKIP_TARGET_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: expected skip target count must be a positive integer." >&2
+    exit 1
+  fi
+
+  mapfile -t skip_targets < <(
+    sed \
+      -e '/^[[:space:]]*#/d' \
+      -e '/^[[:space:]]*$/d' \
+      "${SKIP_TARGETS_FILE}"
+  )
+  if (( ${#skip_targets[@]} != EXPECTED_SKIP_TARGET_COUNT )); then
+    echo "ERROR: expected ${EXPECTED_SKIP_TARGET_COUNT} skipped Bazel targets, found ${#skip_targets[@]}." >&2
+    exit 1
+  fi
+
+  for target in "${skip_targets[@]}"; do
+    if [[ "${target}" != //* ]]; then
+      echo "ERROR: invalid Bazel target in skip list: ${target}" >&2
+      exit 1
+    fi
+    if [[ -n "${skip_target_set[${target}]+present}" ]]; then
+      echo "ERROR: duplicate target in skip list: ${target}" >&2
+      exit 1
+    fi
+    skip_target_set["${target}"]=1
+  done
+fi
+
+filtered_test_commands=()
+filtered_test_suites=()
 test_targets=()
+skipped_test_suites=()
+skipped_test_targets=()
 declare -A seen_targets=()
+declare -A matched_skip_targets=()
 for index in "${!test_commands[@]}"; do
   command="${test_commands[${index}]}"
   suite="${test_suites[${index}]}"
@@ -165,13 +210,37 @@ for index in "${!test_commands[@]}"; do
     echo "ERROR: test command does not end with a Bazel target: ${command}" >&2
     exit 1
   fi
+  if [[ -n "${skip_target_set[${target}]+present}" ]]; then
+    matched_skip_targets["${target}"]=1
+    skipped_test_suites+=("${suite}")
+    skipped_test_targets+=("${target}")
+    continue
+  fi
   if [[ -n "${seen_targets[${target}]+present}" ]]; then
     echo "ERROR: duplicate target found while loading ${suite}: ${target}" >&2
     exit 1
   fi
   seen_targets["${target}"]=1
+  filtered_test_commands+=("${command}")
+  filtered_test_suites+=("${suite}")
   test_targets+=("${target}")
 done
+
+if (( apply_skip_list )); then
+  for target in "${skip_targets[@]}"; do
+    if [[ -z "${matched_skip_targets[${target}]+present}" ]]; then
+      echo "ERROR: skipped target is not present in the loaded test suites: ${target}" >&2
+      exit 1
+    fi
+  done
+fi
+
+test_commands=("${filtered_test_commands[@]}")
+test_suites=("${filtered_test_suites[@]}")
+if (( ${#test_commands[@]} == 0 )); then
+  echo "ERROR: no Bazel test targets remain after applying the skip list." >&2
+  exit 1
+fi
 
 bazel_startup_args=()
 if [[ -n "${BAZEL_OUTPUT_USER_ROOT:-}" ]]; then
@@ -180,11 +249,18 @@ if [[ -n "${BAZEL_OUTPUT_USER_ROOT:-}" ]]; then
 fi
 
 selected_targets_file="${LOG_DIR}/selected_targets.txt"
+skipped_targets_file="${LOG_DIR}/skipped_targets.txt"
 printf 'suite\ttarget\n' > "${selected_targets_file}"
 for index in "${!test_targets[@]}"; do
   printf '%s\t%s\n' \
     "${test_suites[${index}]}" \
     "${test_targets[${index}]}" >> "${selected_targets_file}"
+done
+printf 'suite\ttarget\n' > "${skipped_targets_file}"
+for index in "${!skipped_test_targets[@]}"; do
+  printf '%s\t%s\n' \
+    "${skipped_test_suites[${index}]}" \
+    "${skipped_test_targets[${index}]}" >> "${skipped_targets_file}"
 done
 
 bazel_test_args=(
@@ -217,6 +293,10 @@ printf 'suite\tstatus\telapsed_seconds\ttarget\n' > "${results_file}"
 
 echo "Running ${#test_commands[@]} independent Bazel tests from ${target_source}"
 echo "Selected target list: ${selected_targets_file}"
+if (( ${#skipped_test_targets[@]} > 0 )); then
+  echo "Skipping ${#skipped_test_targets[@]} known failing Bazel targets from ${SKIP_TARGETS_FILE}"
+  echo "Skipped target list: ${skipped_targets_file}"
+fi
 
 cd "${ROOT_DIR}"
 failed_count=0

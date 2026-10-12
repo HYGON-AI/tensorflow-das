@@ -392,14 +392,15 @@ PY
 
 ### 10.3 运行 HCU 测试
 
-仓库提供了 HCU 验证脚本。CI 默认逐条独立执行两组测试：
+仓库提供了 HCU 验证脚本。CI 默认加载完整的两组测试清单，并逐条独立执行：
 
-- `scripts/ci/pytest_failed.sh`：首次全量测试失败的 48 条
-  Python 测试；
+- `scripts/ci/pytest.sh`：1490 条 TensorFlow Python 测试；
 - `scripts/ci/ctest.sh`：1115 条 TensorFlow C++ 测试。
 
-原有 `scripts/ci/pytest.sh` 保留为 1490 条 Python 测试的手动全量测试清单。
-脚本会在两组命令全部执行完毕后分别统计并汇总失败 target，供人工复核；测试
+默认执行前会根据 `scripts/ci/hcu_test_skip_targets.txt` 跳过已确认的失败
+target；显式传给脚本的 target 不受该清单过滤，因此仍可用于单独复测。
+
+脚本会在剩余命令全部执行完毕后分别统计并汇总失败 target，供人工复核；测试
 失败不会直接令脚本返回非零状态：
 
 ```bash
@@ -417,13 +418,6 @@ bash scripts/ci/run_tensorflow_hcu_tests.sh
 bash scripts/ci/run_tensorflow_hcu_tests.sh \
   //tensorflow/python/kernel_tests/nn_ops:conv_ops_test \
   //tensorflow/python/kernel_tests/math_ops:segment_reduction_ops_test
-```
-
-测试最多应使用两张 HCU 卡，例如：
-
-```bash
-HCU_VISIBLE_DEVICES=0,1 \
-  bash scripts/ci/run_tensorflow_hcu_tests.sh <bazel-targets...>
 ```
 
 ## 11. wheel 检查

@@ -61,7 +61,7 @@ concurrency:
 jobs:
   manual_approval:
     name: Manual approval for HCU CI
-    runs-on: [self-hosted, nmz1]
+    runs-on: [self-hosted, bw1100]
     environment: ci-protection
     if: ${{ github.event_name == 'pull_request_target' }}
     steps:
@@ -72,7 +72,7 @@ jobs:
     timeout-minutes: 1080
     needs: [manual_approval]
     if: ${{ always() && (needs.manual_approval.result == 'success' || needs.manual_approval.result == 'skipped') }}
-    runs-on: [self-hosted, nmz1]
+    runs-on: [self-hosted, bw1100]
     env:
       DTK_VERSION: ${{ vars.HCU_DTK_VERSION || '26.10' }}
       DTK_DOWNLOAD_BASE_URL: ${{ vars.HCU_DTK_DOWNLOAD_BASE_URL || 'https://download.sourcefind.cn:65024/file/1' }}
