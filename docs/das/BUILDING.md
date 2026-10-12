@@ -183,7 +183,7 @@ export TF_ROCM_AMDGPU_TARGETS="$(
 )"
 
 test -n "${TF_ROCM_AMDGPU_TARGETS}"
-echo "TF_ROCM_AMDGPU_TARGETS=${TF_ROCM_AMDGPU_TARGETS}"
+echo "HCU_TARGETS=${TF_ROCM_AMDGPU_TARGETS}"
 ```
 
 日常开发建议只编译当前机器实际使用的架构，以缩短编译时间。只有需要生成多架构
@@ -466,7 +466,6 @@ unzip -l dist/*.whl |
 ```bash
 source /opt/dtk/env.sh
 echo "ROCM_PATH=${ROCM_PATH:-}"
-echo "TF_ROCM_AMDGPU_TARGETS=${TF_ROCM_AMDGPU_TARGETS:-}"
 /opt/dtk/bin/rocminfo | grep -oE 'gfx[0-9a-f]+' | sort -u
 ```
 

@@ -1,4 +1,7 @@
 /* Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+SPDX-License-Identifier: Apache-2.0
+Modified by Hygon Information Technology Co., Ltd., 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +21,7 @@ limitations under the License.
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/str_replace.h"
 #include "third_party/gpus/cuda/cuda_config.h"
 #include "tensorflow/tsl/platform/env.h"
 #include "tensorflow/tsl/platform/errors.h"
@@ -47,18 +51,26 @@ string GetCufftVersion() { return TF_CUFFT_VERSION; }
 string GetCusparseVersion() { return TF_CUSPARSE_VERSION; }
 string GetTensorRTVersion() { return TF_TENSORRT_VERSION; }
 
-StatusOr<void*> GetDsoHandle(const string& name, const string& version) {
+StatusOr<void*> GetDsoHandle(const string& name, const string& version, const string& display_name = "") {
   auto filename = Env::Default()->FormatLibraryFileName(name, version);
+  const string& visible_name =
+      display_name.empty() ? filename : display_name;
   void* dso_handle;
   Status status =
       Env::Default()->LoadDynamicLibrary(filename.c_str(), &dso_handle);
   if (status.ok()) {
-    VLOG(1) << "Successfully opened dynamic library " << filename;
+    VLOG(1) << "Successfully opened dynamic library " << visible_name;
     return dso_handle;
   }
 
-  auto message = absl::StrCat("Could not load dynamic library '", filename,
-                              "'; dlerror: ", status.message());
+  string error_detail(status.message());
+  if (!display_name.empty()) {
+    error_detail =
+        absl::StrReplaceAll(error_detail, {{filename, display_name}});
+  }
+
+  auto message = absl::StrCat("Could not load dynamic library '", visible_name,
+                              "'; dlerror: ", error_detail);
 #if !defined(PLATFORM_WINDOWS)
   if (const char* ld_library_path = getenv("LD_LIBRARY_PATH")) {
     message += absl::StrCat("; LD_LIBRARY_PATH: ", ld_library_path);
@@ -166,7 +178,7 @@ StatusOr<void*> GetHipsparseDsoHandle() {
   return GetDsoHandle("hipsparse", "");
 }
 
-StatusOr<void*> GetHipDsoHandle() { return GetDsoHandle("amdhip64", ""); }
+StatusOr<void*> GetHipDsoHandle() { return GetDsoHandle("amdhip64", "", "HIP runtime library"); }
 
 }  // namespace DsoLoader
 
