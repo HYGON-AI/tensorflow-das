@@ -323,7 +323,10 @@ def _select_rocm_lib_paths(repository_ctx, libs_paths, bash_bin):
                 selected_path = path
             i = i + 1
         if selected_path == None:
-            auto_configure_fail("Cannot find rocm library %s" % name)
+            if name == "amdhip64":
+                auto_configure_fail("Cannot find HIP runtime library")
+            else:
+                auto_configure_fail("Cannot find rocm library %s" % name)
 
         libs[name] = struct(file_name = selected_path.basename, path = realpath(repository_ctx, selected_path, bash_bin))
 
