@@ -1,0 +1,71 @@
+# Copyright (c) 2026 Hygon Information Technology Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Bazel test targets temporarily skipped by the default TensorFlow HCU CI run.
+# Keep one target per line. Explicit command-line targets are not filtered by
+# this list, so an individual skipped target can still be rerun for diagnosis.
+
+# TensorFlow Python tests.
+//tensorflow/python:collective_ops_gpu_test_2gpu
+//tensorflow/python:collective_ops_gpu_test_cpu
+//tensorflow/python:collective_ops_gpu_test_gpu
+//tensorflow/python:collective_ops_test
+//tensorflow/python:sparse_ops_test
+//tensorflow/python/autograph/tests:loop_basic_test
+//tensorflow/python/data/experimental/kernel_tests/service:data_service_ops_test
+//tensorflow/python/data/experimental/kernel_tests/service:multi_device_test
+//tensorflow/python/data/kernel_tests:sample_from_datasets_test
+//tensorflow/python/debug/examples/v2:examples_v2_test
+//tensorflow/python/debug/lib:session_debug_multi_gpu_test_cpu
+//tensorflow/python/debug/lib:session_debug_multi_gpu_test_gpu
+//tensorflow/python/distribute:cross_device_ops_test_2gpu
+//tensorflow/python/distribute:cross_device_ops_test_cpu
+//tensorflow/python/distribute:cross_device_ops_test_gpu
+//tensorflow/python/distribute:moving_averages_test_2gpu
+//tensorflow/python/distribute:moving_averages_test_cpu
+//tensorflow/python/distribute:moving_averages_test_gpu
+//tensorflow/python/distribute:multi_worker_continuous_run_test_cpu
+//tensorflow/python/distribute:multi_worker_continuous_run_test_gpu
+//tensorflow/python/distribute:sharded_variable_test
+//tensorflow/python/distribute:strategy_gather_test_2gpu
+//tensorflow/python/distribute:strategy_gather_test_cpu
+//tensorflow/python/distribute:strategy_gather_test_gpu
+//tensorflow/python/distribute:strategy_gather_test_xla_gpu
+//tensorflow/python/distribute:strategy_gather_test_xla_2gpu
+//tensorflow/python/distribute/v1:cross_device_ops_test_2gpu
+//tensorflow/python/distribute/v1:cross_device_ops_test_cpu
+//tensorflow/python/distribute/v1:cross_device_ops_test_gpu
+//tensorflow/python/eager/polymorphic_function:quarantine_test
+//tensorflow/python/framework:config_vgpu_test_2gpu
+//tensorflow/python/framework:config_vgpu_test_cpu
+//tensorflow/python/framework:config_vgpu_test_gpu
+//tensorflow/python/framework:extension_type_test
+//tensorflow/python/grappler:cluster_test_cpu
+//tensorflow/python/grappler:cluster_test_gpu
+//tensorflow/python/grappler:cost_analyzer_test
+//tensorflow/python/grappler:remapper_test_cpu
+//tensorflow/python/grappler:remapper_test_gpu
+//tensorflow/python/kernel_tests:collective_ops_test_2gpu
+//tensorflow/python/kernel_tests:collective_ops_test_cpu
+//tensorflow/python/kernel_tests:collective_ops_test_gpu
+//tensorflow/python/kernel_tests/array_ops:batch_scatter_ops_test
+//tensorflow/python/kernel_tests/data_structures:lookup_ops_test
+//tensorflow/python/kernel_tests/data_structures:map_ops_test
+//tensorflow/python/kernel_tests/math_ops:cwise_ops_binary_test_cpu
+//tensorflow/python/kernel_tests/math_ops:cwise_ops_binary_test_gpu
+//tensorflow/python/kernel_tests/sparse_ops:sparse_slice_op_test
+//tensorflow/python/ops/ragged:ragged_tensor_test
+//tensorflow/python/distribute:input_lib_test_cpu
+//tensorflow/python/framework:config_test_2gpu
+//tensorflow/python:framework_ops_test
+//tensorflow/python:framework_kernels_test
+//tensorflow/python:function_def_to_graph_test
+//tensorflow/python:op_def_library_test
+//tensorflow/python/distribute:input_lib_test_2gpu
+//tensorflow/python/distribute:input_lib_test_gpu
+//tensorflow/python:framework_importer_test
+
+# TensorFlow C++ tests.
+//tensorflow/core/kernels:stochastic_cast_op_test
+//tensorflow/core/kernels/mlir_generated:gpu_binary_ops_test_cpu
+//tensorflow/core/kernels/mlir_generated:gpu_binary_ops_test_gpu
