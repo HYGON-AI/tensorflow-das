@@ -8,7 +8,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DTK_DIR="${DTK_DIR:-/opt/dtk}"
 PYTHON_BIN="${PYTHON_BIN:-python3.11}"
 BAZEL_BIN="${BAZEL_BIN:-bazel}"
-HCU_VISIBLE_DEVICES="${HCU_VISIBLE_DEVICES:-0}"
+HCU_VISIBLE_DEVICES="${HCU_VISIBLE_DEVICES:-0,1}"
+HCU_TEST_EXECUTION_MODE="${HCU_TEST_EXECUTION_MODE:-serial}"
+HCU_TEST_CONCURRENCY="${HCU_TEST_CONCURRENCY:-}"
 TF_ROCM_AMDGPU_TARGETS="${TF_ROCM_AMDGPU_TARGETS:-${HCU_TARGETS:-}}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/test_logs/tensorflow-hcu}"
 PYTHON_TEST_COMMANDS_FILE="${HCU_PYTHON_TEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/pytest.sh}"
@@ -17,6 +19,8 @@ CTEST_COMMANDS_FILE="${HCU_CTEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/ctest.sh}
 EXPECTED_CTEST_COMMAND_COUNT="${HCU_EXPECTED_CTEST_COMMAND_COUNT:-1115}"
 SKIP_TARGETS_FILE="${HCU_TEST_SKIP_TARGETS_FILE:-${ROOT_DIR}/scripts/ci/hcu_test_skip_targets.txt}"
 EXPECTED_SKIP_TARGET_COUNT="${HCU_EXPECTED_SKIP_TARGET_COUNT:-61}"
+DEVICE_WRAPPER="${ROOT_DIR}/scripts/ci/hcu_test_device_wrapper.sh"
+BEP_PARSER="${ROOT_DIR}/scripts/ci/parse_bazel_test_bep.py"
 
 if [[ ! -f "${DTK_DIR}/env.sh" ]]; then
   echo "ERROR: DTK environment not found: ${DTK_DIR}/env.sh" >&2
@@ -30,14 +34,76 @@ set -u
 unset PYTHONPATH
 
 export ROCM_PATH="${ROCM_PATH:-${DTK_DIR}}"
-export HIP_VISIBLE_DEVICES="${HCU_VISIBLE_DEVICES}"
-export ROCR_VISIBLE_DEVICES="${HCU_VISIBLE_DEVICES}"
 export TF_CPP_MIN_LOG_LEVEL="${TF_CPP_MIN_LOG_LEVEL:-0}"
+unset HIP_VISIBLE_DEVICES
+unset ROCR_VISIBLE_DEVICES
 
-device_count="$(tr ',' '\n' <<<"${HCU_VISIBLE_DEVICES}" | sed '/^[[:space:]]*$/d' | wc -l)"
-if (( device_count == 0 || device_count > 2 )); then
-  echo "ERROR: HCU_VISIBLE_DEVICES must expose one or two devices, got: ${HCU_VISIBLE_DEVICES}" >&2
+IFS=',' read -r -a requested_devices <<<"${HCU_VISIBLE_DEVICES}"
+device_ids=()
+declare -A seen_device_ids=()
+for requested_device in "${requested_devices[@]}"; do
+  device="${requested_device//[[:space:]]/}"
+  if [[ -z "${device}" ]]; then
+    echo "ERROR: HCU_VISIBLE_DEVICES contains an empty device entry: ${HCU_VISIBLE_DEVICES}" >&2
+    exit 1
+  fi
+  if [[ -n "${seen_device_ids[${device}]+present}" ]]; then
+    echo "ERROR: HCU_VISIBLE_DEVICES contains a duplicate device: ${device}" >&2
+    exit 1
+  fi
+  seen_device_ids["${device}"]=1
+  device_ids+=("${device}")
+done
+
+device_count="${#device_ids[@]}"
+if [[ "${HCU_TEST_EXECUTION_MODE}" != "serial" &&
+      "${HCU_TEST_EXECUTION_MODE}" != "parallel" ]]; then
+  echo "ERROR: HCU_TEST_EXECUTION_MODE must be serial or parallel, got: ${HCU_TEST_EXECUTION_MODE}" >&2
   exit 1
+fi
+
+device_pairs=()
+if [[ "${HCU_TEST_EXECUTION_MODE}" == "serial" ]]; then
+  if (( device_count == 0 || device_count > 2 )); then
+    echo "ERROR: serial mode requires one or two devices, got: ${HCU_VISIBLE_DEVICES}" >&2
+    exit 1
+  fi
+  device_pairs+=("$(IFS=,; echo "${device_ids[*]}")")
+  HCU_DEVICE_PAIRS="${device_pairs[0]}"
+  HCU_TEST_CONCURRENCY=1
+else
+  if (( device_count < 2 || device_count % 2 != 0 )); then
+    echo "ERROR: parallel mode requires an even number of at least two devices, got: ${HCU_VISIBLE_DEVICES}" >&2
+    exit 1
+  fi
+  for ((index = 0; index < device_count; index += 2)); do
+    device_pairs+=("${device_ids[${index}]},${device_ids[$((index + 1))]}")
+  done
+  printf -v HCU_DEVICE_PAIRS '%s;' "${device_pairs[@]}"
+  HCU_DEVICE_PAIRS="${HCU_DEVICE_PAIRS%;}"
+
+  if [[ -z "${HCU_TEST_CONCURRENCY}" ]]; then
+    HCU_TEST_CONCURRENCY="${#device_pairs[@]}"
+  fi
+  if [[ ! "${HCU_TEST_CONCURRENCY}" =~ ^[1-9][0-9]*$ ]] ||
+      (( HCU_TEST_CONCURRENCY > ${#device_pairs[@]} )); then
+    echo "ERROR: HCU_TEST_CONCURRENCY must be between 1 and ${#device_pairs[@]}, got: ${HCU_TEST_CONCURRENCY}" >&2
+    exit 1
+  fi
+
+  if [[ ! -f "${DEVICE_WRAPPER}" ]]; then
+    echo "ERROR: HCU test device wrapper not found: ${DEVICE_WRAPPER}" >&2
+    exit 1
+  fi
+  if [[ ! -f "${BEP_PARSER}" ]]; then
+    echo "ERROR: Bazel BEP parser not found: ${BEP_PARSER}" >&2
+    exit 1
+  fi
+  if ! command -v flock >/dev/null 2>&1; then
+    echo "ERROR: flock is required for concurrent HCU test device allocation." >&2
+    exit 1
+  fi
+  BASH_BIN="$(command -v bash)"
 fi
 
 mkdir -p "${LOG_DIR}"
@@ -46,11 +112,18 @@ exec > >(tee -a "${LOG_DIR}/run.log") 2>&1
 echo "TensorFlow HCU test environment:"
 echo "  Python               $(command -v "${PYTHON_BIN}")"
 echo "  DTK                  ${ROCM_PATH}"
-echo "  HIP_VISIBLE_DEVICES  ${HIP_VISIBLE_DEVICES}"
+echo "  Test execution mode  ${HCU_TEST_EXECUTION_MODE}"
+echo "  HCU device pool      ${HCU_VISIBLE_DEVICES}"
+echo "  HCU device pairs     ${HCU_DEVICE_PAIRS}"
+echo "  Test concurrency     ${HCU_TEST_CONCURRENCY}"
 echo "  HCU targets          ${TF_ROCM_AMDGPU_TARGETS:-<not set>}"
 
 echo "Running installed-wheel HCU smoke test"
-(cd /tmp && "${PYTHON_BIN}" - <<'PY')
+(
+export ROCR_VISIBLE_DEVICES="${device_pairs[0]}"
+unset HIP_VISIBLE_DEVICES
+cd /tmp
+"${PYTHON_BIN}" - <<'PY'
 import numpy as np
 import tensorflow as tf
 
@@ -75,6 +148,7 @@ expected = np.array([[19.0, 22.0], [43.0, 50.0]], dtype=np.float32)
 np.testing.assert_allclose(result.numpy(), expected, rtol=1e-5, atol=1e-5)
 print("GPU matmul result:", result.numpy())
 PY
+)
 
 make_test_command() {
   printf 'bazel test -c opt --config=gcvm --config=rocm --test_sharding_strategy=disabled --test_timeout=1080 %s' "$1"
@@ -267,10 +341,19 @@ bazel_test_args=(
   --remote_timeout=300
   --test_output=errors
   "--repo_env=TF_ROCM_AMDGPU_TARGETS=${TF_ROCM_AMDGPU_TARGETS:-}"
-  "--test_env=ROCR_VISIBLE_DEVICES=${ROCR_VISIBLE_DEVICES}"
   "--test_env=ROCM_PATH=${ROCM_PATH}"
   --test_env=LD_LIBRARY_PATH
 )
+if [[ "${HCU_TEST_EXECUTION_MODE}" == "serial" ]]; then
+  bazel_test_args+=("--test_env=ROCR_VISIBLE_DEVICES=${HCU_DEVICE_PAIRS}")
+else
+  bazel_test_args+=(
+    --keep_going
+    --test_keep_going
+    "--local_test_jobs=${HCU_TEST_CONCURRENCY}"
+    "--test_env=HCU_DEVICE_PAIRS=${HCU_DEVICE_PAIRS}"
+  )
+fi
 if [[ -n "${HIPBLASLT_TENSILE_LIBPATH:-}" ]]; then
   bazel_test_args+=("--test_env=HIPBLASLT_TENSILE_LIBPATH=${HIPBLASLT_TENSILE_LIBPATH}")
 fi
@@ -288,10 +371,23 @@ fi
 
 results_file="${LOG_DIR}/results.tsv"
 failed_targets_file="${LOG_DIR}/failed_targets.txt"
-printf 'suite\tstatus\telapsed_seconds\ttarget\n' > "${results_file}"
-: > "${failed_targets_file}"
-
-echo "Running ${#test_commands[@]} independent Bazel tests from ${target_source}"
+if [[ "${HCU_TEST_EXECUTION_MODE}" == "serial" ]]; then
+  printf 'suite\tstatus\telapsed_seconds\ttarget\n' > "${results_file}"
+  : > "${failed_targets_file}"
+  echo "Running ${#test_commands[@]} independent Bazel tests serially from ${target_source}"
+else
+  bep_file="${LOG_DIR}/build_events.json"
+  device_lock_dir="${LOG_DIR}/device-locks"
+  mkdir -p "${device_lock_dir}"
+  rm -f "${bep_file}"
+  bazel_test_args+=(
+    "--test_env=HCU_DEVICE_LOCK_DIR=${device_lock_dir}"
+    "--sandbox_writable_path=${device_lock_dir}"
+    "--run_under=${BASH_BIN} ${DEVICE_WRAPPER}"
+    "--build_event_json_file=${bep_file}"
+  )
+  echo "Running ${#test_commands[@]} Bazel tests with ${HCU_TEST_CONCURRENCY} concurrent two-device slots from ${target_source}"
+fi
 echo "Selected target list: ${selected_targets_file}"
 if (( ${#skipped_test_targets[@]} > 0 )); then
   echo "Skipping ${#skipped_test_targets[@]} known failing Bazel targets from ${SKIP_TARGETS_FILE}"
@@ -302,31 +398,63 @@ cd "${ROOT_DIR}"
 failed_count=0
 declare -A suite_total_counts=()
 declare -A suite_failed_counts=()
-for index in "${!test_commands[@]}"; do
-  command="${test_commands[${index}]}"
-  suite="${test_suites[${index}]}"
-  target="${test_targets[${index}]}"
-  read -r -a command_parts <<<"${command}"
-  suite_total_counts["${suite}"]=$(( ${suite_total_counts["${suite}"]:-0} + 1 ))
+if [[ "${HCU_TEST_EXECUTION_MODE}" == "serial" ]]; then
+  for index in "${!test_commands[@]}"; do
+    command="${test_commands[${index}]}"
+    suite="${test_suites[${index}]}"
+    target="${test_targets[${index}]}"
+    read -r -a command_parts <<<"${command}"
+    suite_total_counts["${suite}"]=$(( ${suite_total_counts["${suite}"]:-0} + 1 ))
 
-  echo
-  echo "[$((index + 1))/${#test_commands[@]}][${suite}] Testing ${target}"
-  start_seconds="${SECONDS}"
+    echo
+    echo "[$((index + 1))/${#test_commands[@]}][${suite}] Testing ${target}"
+    start_seconds="${SECONDS}"
+    if "${BAZEL_BIN}" "${bazel_startup_args[@]}" test \
+        "${bazel_test_args[@]}" \
+        "${command_parts[@]:2}"; then
+      status="PASS"
+    else
+      test_status=$?
+      status="FAIL(${test_status})"
+      failed_count=$((failed_count + 1))
+      suite_failed_counts["${suite}"]=$(( ${suite_failed_counts["${suite}"]:-0} + 1 ))
+      printf '%s\t%s\n' "${suite}" "${target}" >> "${failed_targets_file}"
+    fi
+    elapsed_seconds=$((SECONDS - start_seconds))
+    printf '%s\t%s\t%s\t%s\n' \
+      "${suite}" "${status}" "${elapsed_seconds}" "${target}" | tee -a "${results_file}"
+  done
+else
   if "${BAZEL_BIN}" "${bazel_startup_args[@]}" test \
       "${bazel_test_args[@]}" \
-      "${command_parts[@]:2}"; then
-    status="PASS"
+      -c opt \
+      --config=gcvm \
+      --config=rocm \
+      --test_sharding_strategy=disabled \
+      --test_timeout=1080 \
+      "${test_targets[@]}"; then
+    bazel_status=0
   else
-    test_status=$?
-    status="FAIL(${test_status})"
-    failed_count=$((failed_count + 1))
-    suite_failed_counts["${suite}"]=$(( ${suite_failed_counts["${suite}"]:-0} + 1 ))
-    printf '%s\t%s\n' "${suite}" "${target}" >> "${failed_targets_file}"
+    bazel_status=$?
+    echo "WARNING: batched Bazel test command exited with status ${bazel_status}; parsing per-target results." >&2
   fi
-  elapsed_seconds=$((SECONDS - start_seconds))
-  printf '%s\t%s\t%s\t%s\n' \
-    "${suite}" "${status}" "${elapsed_seconds}" "${target}" | tee -a "${results_file}"
-done
+
+  "${PYTHON_BIN}" "${BEP_PARSER}" \
+    --bep "${bep_file}" \
+    --selected-targets "${selected_targets_file}" \
+    --results "${results_file}" \
+    --failed-targets "${failed_targets_file}"
+
+  failed_count="$(wc -l < "${failed_targets_file}")"
+  failed_count="${failed_count//[[:space:]]/}"
+  for suite in "${test_suites[@]}"; do
+    suite_total_counts["${suite}"]=$(( ${suite_total_counts["${suite}"]:-0} + 1 ))
+  done
+  while IFS=$'\t' read -r suite target; do
+    [[ -n "${suite}" ]] || continue
+    suite_failed_counts["${suite}"]=$(( ${suite_failed_counts["${suite}"]:-0} + 1 ))
+  done < "${failed_targets_file}"
+fi
 
 echo "Test suite summary:"
 declare -A reported_suites=()
@@ -347,5 +475,8 @@ else
   echo "All ${#test_commands[@]} TensorFlow HCU tests passed."
 fi
 
+if [[ "${HCU_TEST_EXECUTION_MODE}" == "parallel" ]]; then
+  echo "Bazel batch exit status: ${bazel_status}"
+fi
 echo "TensorFlow HCU test execution completed."
 exit 0

@@ -11,8 +11,11 @@
 #   HCU_PIP_INDEX_URL               Python package index URL.
 #   HCU_AMDGPU_TARGETS              Compile targets. When empty, detect them
 #                                   from the HCU devices attached to the runner.
-#   HCU_VISIBLE_DEVICES             Test devices, default: 0,1. At most two
-#                                   devices should be exposed to this workflow.
+#   HCU_VISIBLE_DEVICES             Test device pool, default: 0-7. Devices are
+#                                   assigned to concurrent tests in pairs.
+#   HCU_TEST_EXECUTION_MODE          Test execution mode, default: parallel.
+#   HCU_TEST_CONCURRENCY            Concurrent tests, default: 4. Must not be
+#                                   greater than half the visible device count.
 #   HCU_BAZEL_TEST_TARGETS          Space-separated Bazel test targets.
 
 name: CI HCU
@@ -78,7 +81,9 @@ jobs:
       DTK_DOWNLOAD_BASE_URL: ${{ vars.HCU_DTK_DOWNLOAD_BASE_URL || 'https://download.sourcefind.cn:65024/file/1' }}
       PYTHON_BIN: ${{ vars.HCU_PYTHON_BIN || 'python3.11' }}
       HCU_TARGETS: ${{ vars.HCU_AMDGPU_TARGETS }}
-      HCU_VISIBLE_DEVICES: ${{ vars.HCU_VISIBLE_DEVICES || '0,1' }}
+      HCU_VISIBLE_DEVICES: ${{ vars.HCU_VISIBLE_DEVICES || '0,1,2,3,4,5,6,7' }}
+      HCU_TEST_EXECUTION_MODE: ${{ vars.HCU_TEST_EXECUTION_MODE || 'parallel' }}
+      HCU_TEST_CONCURRENCY: ${{ vars.HCU_TEST_CONCURRENCY || '4' }}
       HCU_BAZEL_TEST_TARGETS: ${{ vars.HCU_BAZEL_TEST_TARGETS }}
       BAZEL_OUTPUT_USER_ROOT: ${{ github.workspace }}/.bazel-output
     container:
