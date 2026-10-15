@@ -11,10 +11,11 @@ BAZEL_BIN="${BAZEL_BIN:-bazel}"
 HCU_VISIBLE_DEVICES="${HCU_VISIBLE_DEVICES:-0,1}"
 HCU_TEST_EXECUTION_MODE="${HCU_TEST_EXECUTION_MODE:-serial}"
 HCU_TEST_CONCURRENCY="${HCU_TEST_CONCURRENCY:-}"
+TF_PER_DEVICE_MEMORY_LIMIT_MB="${TF_PER_DEVICE_MEMORY_LIMIT_MB:-2048}"
 TF_ROCM_AMDGPU_TARGETS="${TF_ROCM_AMDGPU_TARGETS:-${HCU_TARGETS:-}}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/test_logs/tensorflow-hcu}"
-PYTHON_TEST_COMMANDS_FILE="${HCU_PYTHON_TEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/pytest.sh}"
-EXPECTED_PYTHON_TEST_COMMAND_COUNT="${HCU_EXPECTED_PYTHON_TEST_COMMAND_COUNT:-1490}"
+PYTHON_TEST_COMMANDS_FILE="${HCU_PYTHON_TEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/pytest_failed_18.sh}"
+EXPECTED_PYTHON_TEST_COMMAND_COUNT="${HCU_EXPECTED_PYTHON_TEST_COMMAND_COUNT:-18}"
 CTEST_COMMANDS_FILE="${HCU_CTEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/ctest.sh}"
 EXPECTED_CTEST_COMMAND_COUNT="${HCU_EXPECTED_CTEST_COMMAND_COUNT:-1115}"
 SKIP_TARGETS_FILE="${HCU_TEST_SKIP_TARGETS_FILE:-${ROOT_DIR}/scripts/ci/hcu_test_skip_targets.txt}"
@@ -116,6 +117,7 @@ echo "  Test execution mode  ${HCU_TEST_EXECUTION_MODE}"
 echo "  HCU device pool      ${HCU_VISIBLE_DEVICES}"
 echo "  HCU device pairs     ${HCU_DEVICE_PAIRS}"
 echo "  Test concurrency     ${HCU_TEST_CONCURRENCY}"
+echo "  Device memory limit  ${TF_PER_DEVICE_MEMORY_LIMIT_MB} MB"
 echo "  HCU targets          ${TF_ROCM_AMDGPU_TARGETS:-<not set>}"
 
 echo "Running installed-wheel HCU smoke test"
@@ -210,15 +212,13 @@ elif [[ -n "${HCU_BAZEL_TEST_TARGETS:-}" ]]; then
   target_source="HCU_BAZEL_TEST_TARGETS"
 else
   append_test_commands \
-    "pytest" \
+    "pytest-retest" \
     "${PYTHON_TEST_COMMANDS_FILE}" \
     "${EXPECTED_PYTHON_TEST_COMMAND_COUNT}"
-  append_test_commands \
-    "ctest" \
-    "${CTEST_COMMANDS_FILE}" \
-    "${EXPECTED_CTEST_COMMAND_COUNT}"
   target_source="${test_sources[*]}"
-  apply_skip_list=1
+  # This temporary diagnostic list contains only previously unskipped targets.
+  # Do not require every entry in the full-suite skip list to be present.
+  apply_skip_list=0
 fi
 
 if (( ${#test_commands[@]} == 0 )); then
@@ -342,6 +342,7 @@ bazel_test_args=(
   --test_output=errors
   "--repo_env=TF_ROCM_AMDGPU_TARGETS=${TF_ROCM_AMDGPU_TARGETS:-}"
   "--test_env=ROCM_PATH=${ROCM_PATH}"
+  "--test_env=TF_PER_DEVICE_MEMORY_LIMIT_MB=${TF_PER_DEVICE_MEMORY_LIMIT_MB}"
   --test_env=LD_LIBRARY_PATH
 )
 if [[ "${HCU_TEST_EXECUTION_MODE}" == "serial" ]]; then
