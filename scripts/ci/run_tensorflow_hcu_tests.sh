@@ -14,8 +14,8 @@ HCU_TEST_CONCURRENCY="${HCU_TEST_CONCURRENCY:-}"
 TF_PER_DEVICE_MEMORY_LIMIT_MB="${TF_PER_DEVICE_MEMORY_LIMIT_MB:-2048}"
 TF_ROCM_AMDGPU_TARGETS="${TF_ROCM_AMDGPU_TARGETS:-${HCU_TARGETS:-}}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/test_logs/tensorflow-hcu}"
-PYTHON_TEST_COMMANDS_FILE="${HCU_PYTHON_TEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/pytest_failed_18.sh}"
-EXPECTED_PYTHON_TEST_COMMAND_COUNT="${HCU_EXPECTED_PYTHON_TEST_COMMAND_COUNT:-18}"
+PYTHON_TEST_COMMANDS_FILE="${HCU_PYTHON_TEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/pytest.sh}"
+EXPECTED_PYTHON_TEST_COMMAND_COUNT="${HCU_EXPECTED_PYTHON_TEST_COMMAND_COUNT:-1490}"
 CTEST_COMMANDS_FILE="${HCU_CTEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/ctest.sh}"
 EXPECTED_CTEST_COMMAND_COUNT="${HCU_EXPECTED_CTEST_COMMAND_COUNT:-1115}"
 SKIP_TARGETS_FILE="${HCU_TEST_SKIP_TARGETS_FILE:-${ROOT_DIR}/scripts/ci/hcu_test_skip_targets.txt}"
@@ -212,13 +212,15 @@ elif [[ -n "${HCU_BAZEL_TEST_TARGETS:-}" ]]; then
   target_source="HCU_BAZEL_TEST_TARGETS"
 else
   append_test_commands \
-    "pytest-retest" \
+    "pytest" \
     "${PYTHON_TEST_COMMANDS_FILE}" \
     "${EXPECTED_PYTHON_TEST_COMMAND_COUNT}"
+  append_test_commands \
+    "ctest" \
+    "${CTEST_COMMANDS_FILE}" \
+    "${EXPECTED_CTEST_COMMAND_COUNT}"
   target_source="${test_sources[*]}"
-  # This temporary diagnostic list contains only previously unskipped targets.
-  # Do not require every entry in the full-suite skip list to be present.
-  apply_skip_list=0
+  apply_skip_list=1
 fi
 
 if (( ${#test_commands[@]} == 0 )); then
@@ -343,6 +345,7 @@ bazel_test_args=(
   "--repo_env=TF_ROCM_AMDGPU_TARGETS=${TF_ROCM_AMDGPU_TARGETS:-}"
   "--test_env=ROCM_PATH=${ROCM_PATH}"
   "--test_env=TF_PER_DEVICE_MEMORY_LIMIT_MB=${TF_PER_DEVICE_MEMORY_LIMIT_MB}"
+  "--action_env=TF_PER_DEVICE_MEMORY_LIMIT_MB=${TF_PER_DEVICE_MEMORY_LIMIT_MB}"
   --test_env=LD_LIBRARY_PATH
 )
 if [[ "${HCU_TEST_EXECUTION_MODE}" == "serial" ]]; then
