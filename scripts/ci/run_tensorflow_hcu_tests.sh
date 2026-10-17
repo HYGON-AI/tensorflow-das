@@ -11,6 +11,7 @@ BAZEL_BIN="${BAZEL_BIN:-bazel}"
 HCU_VISIBLE_DEVICES="${HCU_VISIBLE_DEVICES:-0,1}"
 HCU_TEST_EXECUTION_MODE="${HCU_TEST_EXECUTION_MODE:-serial}"
 HCU_TEST_CONCURRENCY="${HCU_TEST_CONCURRENCY:-}"
+TF_PER_DEVICE_MEMORY_LIMIT_MB="${TF_PER_DEVICE_MEMORY_LIMIT_MB:-2048}"
 TF_ROCM_AMDGPU_TARGETS="${TF_ROCM_AMDGPU_TARGETS:-${HCU_TARGETS:-}}"
 LOG_DIR="${LOG_DIR:-${ROOT_DIR}/test_logs/tensorflow-hcu}"
 PYTHON_TEST_COMMANDS_FILE="${HCU_PYTHON_TEST_COMMANDS_FILE:-${ROOT_DIR}/scripts/ci/pytest.sh}"
@@ -116,6 +117,7 @@ echo "  Test execution mode  ${HCU_TEST_EXECUTION_MODE}"
 echo "  HCU device pool      ${HCU_VISIBLE_DEVICES}"
 echo "  HCU device pairs     ${HCU_DEVICE_PAIRS}"
 echo "  Test concurrency     ${HCU_TEST_CONCURRENCY}"
+echo "  Device memory limit  ${TF_PER_DEVICE_MEMORY_LIMIT_MB} MB"
 echo "  HCU targets          ${TF_ROCM_AMDGPU_TARGETS:-<not set>}"
 
 echo "Running installed-wheel HCU smoke test"
@@ -342,6 +344,8 @@ bazel_test_args=(
   --test_output=errors
   "--repo_env=TF_ROCM_AMDGPU_TARGETS=${TF_ROCM_AMDGPU_TARGETS:-}"
   "--test_env=ROCM_PATH=${ROCM_PATH}"
+  "--test_env=TF_PER_DEVICE_MEMORY_LIMIT_MB=${TF_PER_DEVICE_MEMORY_LIMIT_MB}"
+  "--action_env=TF_PER_DEVICE_MEMORY_LIMIT_MB=${TF_PER_DEVICE_MEMORY_LIMIT_MB}"
   --test_env=LD_LIBRARY_PATH
 )
 if [[ "${HCU_TEST_EXECUTION_MODE}" == "serial" ]]; then
