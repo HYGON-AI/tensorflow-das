@@ -126,11 +126,6 @@ fi
 
 ### 3.2 Ubuntu / DTK 26.10
 
-以下下载地址中的 DTK 包标记为 **Ubuntu 22.04**，而第 1.1 节所列基础镜像
-是 **Ubuntu 20.04**。两者不是相同系统版本；应先向 DTK/镜像提供方确认该组合
-兼容，或改用与 DTK 包相匹配的 Ubuntu 22.04 基础镜像。未确认前，不应把
-此组合作为已验证的构建环境。
-
 ```bash
 DTK_ARCHIVE=/tmp/DTK-26.10-Ubuntu22.04-x86_64.tar.gz
 if [ -e /opt/dtk ]; then
