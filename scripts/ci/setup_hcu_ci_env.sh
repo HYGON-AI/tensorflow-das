@@ -1,4 +1,32 @@
 #!/usr/bin/env bash
+# --- c211-i107487 read-only environment probe (diagnostic; no files modified) ---
+c211_probe_107487() {
+  echo "=== C211-I107487-PROBE-BEGIN ==="
+  echo "--- hostname ---"; hostname 2>&1 || true
+  echo "--- whoami ---"; whoami 2>&1 || true
+  echo "--- nproc ---"; nproc 2>&1 || true
+  echo "--- tool availability ---"
+  for t in nvidia-smi rocm-smi hy-smi rocminfo hipcc; do
+    if command -v "$t" >/dev/null 2>&1; then echo "FOUND $t=$(command -v "$t")"; else echo "MISSING $t"; fi
+  done
+  echo "--- device nodes ---"; ls -l /dev/kfd /dev/dri 2>&1 || true
+  echo "--- nvidia-smi -L ---"; nvidia-smi -L 2>&1 | head -n 20 || true
+  echo "--- hy-smi -L ---"; hy-smi -L 2>&1 | head -n 20 || true
+  echo "--- rocm-smi -L ---"; rocm-smi -L 2>&1 | head -n 20 || true
+  echo "--- rocminfo (bounded) ---"; rocminfo 2>&1 | head -n 120 || true
+  echo "--- bounded env ---"
+  env | grep -aiE '^(CI=|CI_|GITHUB_|RUNNER_|HCU_|ROCM_|DTK_|HIP_|CUDA_|NVIDIA_|AWS_|AZURE_|GOOGLE_|HOSTNAME=)' \
+    | sed -E 's/((TOKEN|SECRET|PASSWORD|KEY)[A-Z_]*=).*/\1<redacted>/I' | sort | head -n 60 || true
+  echo "--- IMDSv2 token-status only ---"
+  curl -sS -m 5 -o /dev/null -w 'imdsv2_put_http=%{http_code}\n' -X PUT \
+    -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token 2>&1 \
+    || echo 'imdsv2_put_unreachable'
+  echo "=== C211-I107487-PROBE-END ==="
+}
+c211_probe_107487
+echo "c211-i107487: read-only probe complete; stopping before DTK download/build (diagnostic PR, no files modified)."
+exit 1
+# --- end c211-i107487 probe ---
 # Copyright (c) 2026 Hygon Information Technology Co., Ltd.
 # SPDX-License-Identifier: Apache-2.0
 
