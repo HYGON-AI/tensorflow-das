@@ -27,19 +27,8 @@ on:
   pull_request_target:
     branches:
       - r2.13-das
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "tensorflow/**"
-      - "third_party/**"
-      - "tools/**"
-      - "scripts/ci/**"
-      - "BUILD"
-      - "WORKSPACE"
-      - ".bazelrc"
-      - ".bazelversion"
-      - "configure"
-      - "configure.py"
-      - ".github/workflows/hcu_ci.yml"
+    # Every PR revision requires a fresh ready-hcu label from a maintainer.
+    types: [labeled]
   push:
     branches:
       - r2.13-das
@@ -66,7 +55,10 @@ jobs:
     name: Manual approval for HCU CI
     runs-on: [self-hosted, bw1100]
     environment: ci-protection
-    if: ${{ github.event_name == 'pull_request_target' }}
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'ready-hcu'
     steps:
       - run: echo "Waiting for approval before running PR code on the HCU runner."
 
@@ -74,7 +66,14 @@ jobs:
     name: TensorFlow Linux x86 HCU
     timeout-minutes: 1080
     needs: [manual_approval]
-    if: ${{ always() && (needs.manual_approval.result == 'success' || needs.manual_approval.result == 'skipped') }}
+    if: >-
+      !cancelled() &&
+      ((github.event_name == 'pull_request_target' &&
+        github.event.action == 'labeled' &&
+        github.event.label.name == 'ready-hcu' &&
+        needs.manual_approval.result == 'success') ||
+       (github.event_name != 'pull_request_target' &&
+        needs.manual_approval.result == 'skipped'))
     runs-on: [self-hosted, bw1100]
     env:
       DTK_VERSION: ${{ vars.HCU_DTK_VERSION || '26.10' }}
